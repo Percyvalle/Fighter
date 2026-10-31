@@ -12,9 +12,10 @@ import { clampVote } from './config.mjs';
 import { saveAntiStreak, validateAntiStreak } from './streak-settings.mjs';
 import '../public/js/fight.js';
 import '../public/js/roster.js';
+import '../public/js/fight-media.js';
 
 const log = logger('session');
-const { FightScript, Roster } = globalThis;
+const { FightScript, Roster, FightMedia } = globalThis;
 
 export class Session {
   constructor({ cfg, hub, outbox, points, persistAntiStreak = saveAntiStreak }) {
@@ -77,6 +78,11 @@ export class Session {
   /* ---------- transitions ---------- */
 
   seriesOver() { return this.series.total > 0 && this.series.done >= this.series.total; }
+
+  resultHoldMs() {
+    return Math.max(this.cfg.game.resultSeconds * 1000,
+      FightMedia.resultHoldMs(this.script, this.character, this.opponent));
+  }
 
   start() {
     this.clearTimers();
@@ -188,7 +194,7 @@ export class Session {
     this.broadcastPoints();
     // The winner screen stays up until the streamer opens the next vote (or cancels);
     // only the auto loop moves on by itself, and not past the last fight of a series.
-    if (this.autoLoop && !this.seriesOver()) this.later(() => this.finish(), this.cfg.game.resultSeconds * 1000);
+    if (this.autoLoop && !this.seriesOver()) this.later(() => this.finish(), this.resultHoldMs());
   }
 
   finish() {
@@ -342,7 +348,7 @@ export class Session {
     // off, the screen stays up again.
     if (this.phase === 'result') {
       this.clearTimers();
-      if (this.autoLoop) this.later(() => this.finish(), this.cfg.game.resultSeconds * 1000);
+      if (this.autoLoop) this.later(() => this.finish(), this.resultHoldMs());
     }
     this.broadcast();
   }

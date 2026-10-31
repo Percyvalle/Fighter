@@ -14,18 +14,17 @@
      defeat    optional: played when the character loses the whole fight; without
                one they fade out greyed
      head      where the head is across the box, for the damage numbers
-     sfx       optional: own sounds — `punch` clips in place of Vlad's (`peakMs`: how
-               far into them the hit is), `crit` a shout started with the crit clip,
+     sfx       optional: own sounds — `punch` clips in place of Vlad's,
+               `crit` a shout anchored to contact (see fight-media.js),
                `hurt` groans when the gorilla lands a blow, `win` one of them when
                they win the fight, `lose` a reaction to losing the whole fight
      label     optional: how the panel's picker shows them, when two characters
                share a name (Paver in white and in red) */
 (function (root) {
-  // Paver's voice and punches (both outfits), cut from Downloads/Звуки: each punch
-  // hits about 35 ms in; the crit shout, started with the crit clip, peaks ~620 ms
-  // in, right on the blow.
+  // Paver's voice and punches (both outfits), cut from Downloads/Звуки.
+  // Per-file durations and sound anchors live in fight-media.js.
   const PAVER_SFX = {
-    punch: [1, 2, 3].map(n => `assets/sfx/paver-punch-${n}.ogg`), peakMs: 35,
+    punch: [1, 2, 3].map(n => `assets/sfx/paver-punch-${n}.ogg`),
     crit: 'assets/sfx/paver-crit.ogg',
     hurt: [1, 2, 3].map(n => `assets/sfx/paver-hurt-${n}.ogg`),
     win: [1, 2].map(n => `assets/sfx/paver-win-${n}.ogg`),
@@ -44,8 +43,8 @@
       defeat: 'assets/anim/vlad-defeat.webm',
       head: 0.55,
       sfx: {
-        // Only approved review variants A and C; pick() avoids consecutive repeats.
-        punch: ['assets/sfx/vlad-attack-a.mp3', 'assets/sfx/vlad-attack-c.mp3'], peakMs: 35,
+        // A/C plus the original punch; pick() avoids consecutive repeats.
+        punch: ['assets/sfx/vlad-attack-a.mp3', 'assets/sfx/vlad-attack-c.mp3', 'assets/sfx/vlad-attack-original.mp3'],
         crit: 'assets/sfx/vlad-crit-complete.ogg',
         hurt: [1, 2, 3, 4, 5, 6, 7].map(n => `assets/sfx/vlad-hurt-${n}.ogg`),
         win: ['assets/sfx/vlad-win.ogg'],

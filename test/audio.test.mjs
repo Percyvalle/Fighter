@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { Script, createContext, runInContext } from 'node:vm';
 import test from 'node:test';
 import '../public/js/roster.js';
+import '../public/js/fight-media.js';
 
 const html = readFileSync(new URL('../public/overlay.html', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const section = (start, end) => {
@@ -11,30 +12,48 @@ const section = (start, end) => {
   return html.slice(a, b);
 };
 
-function audioScene(search = '') {
-  const scheduled = [], played = [];
+function audioScene(search = '', autoEnd = false) {
+  const scheduled = [], played = [], victories = [];
+  let now = 0;
+  const later = (fn, ms) => scheduled.push({ fn, ms, due: now + ms });
   class Audio {
-    constructor(src) { this.src = src; this.currentTime = 0; this.listeners = new Map(); }
+    constructor(src) { this.src = src; this.currentTime = 0; this.listeners = new Map(); this.playbackRate = 1; }
     cloneNode() { return new Audio(this.src); }
     addEventListener(type, fn) { this.listeners.set(type, fn); }
     removeEventListener(type, fn) { if (this.listeners.get(type) === fn) this.listeners.delete(type); }
     emit(type) { this.listeners.get(type)?.(); }
-    play() { played.push(this); return Promise.resolve(); }
+    play() {
+      this.startedAt = now;
+      played.push(this);
+      if (autoEnd) later(() => { if (!this.paused) this.emit('ended'); }, FightMedia.cue(this.src).durationMs / this.playbackRate);
+      return Promise.resolve();
+    }
     pause() { this.paused = true; }
   }
   const context = createContext({
-    Audio, URLSearchParams, location: { search },
+    Audio, URLSearchParams, location: { search }, FightMedia, Roster,
     CAST: { fighter: Roster.CHARACTERS.vlad, gorilla: Roster.CHARACTERS.fighter2 },
     TIMING: { contact: 170 },
     other: side => side === 'fighter' ? 'gorilla' : 'fighter',
-    later: (fn, ms) => scheduled.push({ fn, ms }),
+    later,
     pending: [], clearTimeout() {},
-    showResult() {}, shake() {}, stopMusic() {}, setPips() {}, playVictory() {},
+    showResult() {}, shake() {}, stopMusic() {}, setPips() {},
+    playVictory(side) { victories.push({ side, startedAt: now }); }, duckMusic() {},
   });
   runInContext(section('  /* ---------- sound ---------- */', '  /* Fight music:'), context);
   runInContext(section('  function endRound(', '  /**\n   * Play a fight script'), context);
   runInContext(section('  function clearPending()', '  // Restart a CSS animation'), context);
-  return { context, scheduled, played };
+  function advanceTo(target) {
+    for (;;) {
+      const task = scheduled.filter(t => !t.ran && t.due <= target).sort((a, b) => a.due - b.due)[0];
+      if (!task) break;
+      now = task.due;
+      task.ran = true;
+      task.fn();
+    }
+    now = target;
+  }
+  return { context, scheduled, played, victories, advanceTo };
 }
 
 // Advance short scheduled actions; the 15s stalled-audio fallback is explicit.
@@ -146,5 +165,102 @@ test('failed or stalled defeat audio advances the queue once', () => {
     advance(scene);
     assert.equal(scene.played.length, 2);
     assert.equal(scene.played[0].paused, true);
+  }
+});
+
+test('all three Vlad attack accents align to contact without changing voice speed', () => {
+  const scene = audioScene('', true);
+  const sources = Roster.CHARACTERS.vlad.sfx.punch;
+  assert.equal(sources.length, 3);
+  for (const i of sources.keys()) {
+    runInContext(`
+      Math.random = () => (${i} + 0.5) / ${sources.length};
+      schedulePunch({by: 'fighter', ko: ${i === sources.length - 1}}, (fn, ms) => later(fn, ms + ${i * 2000}));
+    `, scene.context);
+  }
+  scene.advanceTo(6000);
+  const attacks = scene.played.filter(a => /vlad-attack-/.test(a.src));
+  assert.deepEqual(attacks.map(a => a.src), sources);
+  for (const [i, a] of attacks.entries()) {
+    assert.equal(a.playbackRate, 1);
+    assert.equal(a.preservesPitch, true);
+    assert.equal(a.startedAt + FightMedia.cue(a.src).peakMs, 170 + i * 2000);
+  }
+  assert.ok(scene.scheduled.some(t => t.ms < 0), 'late accents must be allowed to start before the dash');
+});
+
+test('Vlad crit uses one spoken line anchored independently of the video', () => {
+  const scene = audioScene('', true);
+  runInContext(`Math.random = () => 0.99; schedulePunch({by: 'fighter', crit: true}, (fn, ms) => later(fn, ms + 1000))`, scene.context);
+  scene.advanceTo(4000);
+  const crit = scene.played.find(a => /vlad-crit-complete/.test(a.src));
+  assert.ok(crit);
+  assert.equal(crit.startedAt + FightMedia.cue(crit.src).peakMs, 1170);
+  assert.ok(!scene.played.some(a => /vlad-attack-/.test(a.src)));
+});
+
+test('final hurt finishes intact before defeat and victory, including the gap', () => {
+  const scene = audioScene('', true);
+  runInContext(`
+    playVoice(clip('assets/sfx/vlad-hurt-7.ogg'), 0.5, 0);
+  `, scene.context);
+  scene.advanceTo(470);
+  runInContext(`playResultVoices('gorilla')`, scene.context);
+  scene.advanceTo(918);
+  assert.equal(scene.played.length, 1);
+  assert.notEqual(scene.played[0].paused, true);
+  scene.advanceTo(1019);
+  const defeat = scene.played.find(a => /vlad-defeat/.test(a.src));
+  assert.equal(defeat.startedAt, 1019);
+  scene.advanceTo(4358);
+  const win = scene.played.find(a => /paver-win/.test(a.src));
+  assert.equal(win.startedAt, 1019 + 3089 + 250);
+});
+
+test('cancelling while waiting for final hurt cannot launch result voices', () => {
+  const scene = audioScene('', true);
+  runInContext(`playVoice(clip('assets/sfx/vlad-hurt-7.ogg'), 0.5, 0)`, scene.context);
+  scene.advanceTo(100);
+  runInContext(`playResultVoices('gorilla'); clearPending()`, scene.context);
+  scene.advanceTo(20000);
+  assert.equal(scene.played.length, 1);
+  assert.equal(scene.played[0].paused, true);
+});
+
+test('cancellation also stops punch effects, not just character reactions', () => {
+  const scene = audioScene();
+  runInContext(`schedulePunch({by: 'gorilla'}, later)`, scene.context);
+  advance(scene);
+  const punch = scene.played.find(a => /paver-punch/.test(a.src));
+  assert.ok(punch);
+  runInContext(`clearPending()`, scene.context);
+  assert.equal(punch.paused, true);
+});
+
+test('all character pairs finish KO voices and celebrations within the host hold', () => {
+  const characters = Object.keys(Roster.CHARACTERS);
+  for (const left of characters) for (const right of [...characters, 'gorilla']) {
+    if (left === right) continue;
+    for (const winner of ['fighter', 'gorilla']) for (const crit of [false, true]) {
+      const scene = audioScene('', true);
+      const hit = { at: 1000, by: winner, crit, ko: true };
+      const script = { winner, reveal: 1700, hits: [hit] };
+      runInContext(`
+        CAST.fighter = Roster.CHARACTERS[${JSON.stringify(left)}];
+        CAST.gorilla = Roster.CHARACTERS[${JSON.stringify(right)}] || null;
+        preloadVoice('fighter'); preloadVoice('gorilla');
+        schedulePunch(${JSON.stringify(hit)}, (fn, ms) => later(fn, ms + 1000));
+      `, scene.context);
+      scene.advanceTo(script.reveal);
+      runInContext(`playResultVoices(${JSON.stringify(winner)})`, scene.context);
+      const deadline = script.reveal + Math.max(6000, FightMedia.resultHoldMs(script, left, right));
+      scene.advanceTo(deadline);
+      const label = `${left}/${right}, winner=${winner}, crit=${crit}`;
+      assert.ok(scene.played.every(a => a.paused), `audio still playing: ${label}`);
+      assert.equal(scene.victories.length, 1, `missing celebration: ${label}`);
+      if (right === 'gorilla' && winner === 'gorilla') {
+        assert.ok(scene.victories[0].startedAt + 4084 <= deadline, `victory video cut: ${label}`);
+      }
+    }
   }
 });

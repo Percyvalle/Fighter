@@ -60,7 +60,7 @@
     bottom: 4vh;
     height: min(72vh, 95vw);
     z-index: 3;
-    transition: transform 0.18s cubic-bezier(.2, .9, .3, 1.3), opacity 0.4s ease;
+    transition: transform var(--contact-duration, 170ms) cubic-bezier(.2, .9, .3, 1.3), opacity 0.4s ease;
   }
   .fighter-wrap.left  { left: 4vw; }
   .fighter-wrap.right { right: 4vw; }
@@ -569,6 +569,7 @@
 
 <script src="js/fight.js"></script>
 <script src="js/roster.js"></script>
+<script src="js/fight-media.js"></script>
 <script>
   const $ = id => document.getElementById(id);
   const els = {
@@ -588,11 +589,12 @@
   };
 
   const TIMING = {
-    contact: 170,   // attacker's dash reaches the defender
+    contact: FightMedia.CONTACT_MS, // attacker's dash reaches the defender
     recover: 430,   // both back to their stance
     recoverCrit: 650, // a crit holds the knockback a little longer
     restore: 3000,  // demo mode: back to idle after the result
   };
+  document.documentElement.style.setProperty("--contact-duration", TIMING.contact + "ms");
 
   let NAMES = { fighter: "ВЛАД", gorilla: "ГОРИЛЛА" };
 
@@ -726,6 +728,7 @@
     a.idle.addEventListener("playing", () => { a.ready = true; box.classList.add("has-anim"); }, { once: true });
     a.idle.play().catch(() => {});
     for (const clip of [a, a.crit].filter(Boolean)) {
+      clip.attack.load();
       clip.attack.addEventListener("ended", () => {
         els[side].classList.remove(clip.cls);
         a.idle.currentTime = 0;
@@ -817,13 +820,23 @@
   /* The clip a blow uses: the crit one on a critical blow, if the fighter has it. */
   const clipFor = h => (h.crit && ANIM[h.by].crit) || ANIM[h.by];
 
-  function attackStart(h) {
+  function attackStart(h, elapsedMs = 0) {
     if (!ANIM[h.by].ready) return;
+    attackStop(h.by);
     const clip = clipFor(h);
-    clip.attack.currentTime = 0;
+    const a = ANIM[h.by], generation = a.generation;
+    const startedAt = performance.now();
+    clip.attack.currentTime = elapsedMs / 1000;
     // Show the clip only once its first frame is up, or the last frame of the
     // previous attack would flash for a moment.
-    clip.attack.play().then(() => els[h.by].classList.add(clip.cls)).catch(() => {});
+    clip.attack.play().then(() => {
+      if (ANIM[h.by] !== a || generation !== a.generation) return;
+      const delay = performance.now() - startedAt;
+      const position = (elapsedMs + delay) / 1000;
+      if (Number.isFinite(clip.attack.duration) && position >= clip.attack.duration) return;
+      if (delay > 1000 / 24) clip.attack.currentTime = position;
+      els[h.by].classList.add(clip.cls);
+    }).catch(() => {});
   }
 
   /* The loser of the fight plays their defeat clip instead of fading out, if they
@@ -832,10 +845,13 @@
     const a = ANIM[side];
     if (!a.ready || !a.defeat) return false;
     if (els[side].classList.contains("losing")) return true;
-    attackStop();
+    attackStop(side);
+    const generation = a.generation;
     els[side].classList.remove("defeated", "knock", "hit", "crit");
     a.defeat.currentTime = 0;
-    a.defeat.play().then(() => els[side].classList.add("losing")).catch(() => {});
+    a.defeat.play().then(() => {
+      if (ANIM[side] === a && generation === a.generation) els[side].classList.add("losing");
+    }).catch(() => {});
     return true;
   }
 
@@ -851,13 +867,17 @@
   function playVictory(side) {
     const a = ANIM[side];
     if (!a.ready || !a.victory) return;
-    for (const clip of [a, a.crit].filter(Boolean)) { clip.attack.pause(); els[side].classList.remove(clip.cls); }
+    attackStop(side);
+    const generation = a.generation;
     a.victory.currentTime = 0;
-    a.victory.play().then(() => els[side].classList.add("cheering")).catch(() => {});
+    a.victory.play().then(() => {
+      if (ANIM[side] === a && generation === a.generation) els[side].classList.add("cheering");
+    }).catch(() => {});
   }
 
-  function attackStop() {
-    for (const side of ["fighter", "gorilla"]) {
+  function attackStop(onlySide) {
+    for (const side of onlySide ? [onlySide] : ["fighter", "gorilla"]) {
+      ANIM[side].generation = (ANIM[side].generation || 0) + 1;
       for (const clip of [ANIM[side], ANIM[side].crit].filter(Boolean)) {
         clip.attack.pause();
         els[side].classList.remove(clip.cls);
@@ -872,18 +892,17 @@
      ?volume=0..1 scales everything, ?mute=1 silences the overlay. */
   const params = new URLSearchParams(location.search);
   const VOLUME = params.has("mute") ? 0 : Math.max(0, Math.min(1, parseFloat(params.get("volume") ?? "1") || 0));
-  const clip = src => { const a = new Audio(src); a.preload = "auto"; return a; };
-  /* Per attacker: the clips, and `peakMs` — how far into each clip its loudest
-     moment is. Vlad's punches hit at once; the gorilla's whooshes swell for ~170 ms
-     (cut from media/source/Sound/Massive_heavy_whoosh_#1 / #4), so they start with the
-     dash and peak on contact.
-     The whooshes are almost all sub-200 Hz rumble with no attack, which small
-     speakers barely reproduce and the music masks, so the gorilla also gets a
-     `thud` on contact: Vlad's punches pitched well down — heavier, but audible. */
+  const clip = src => {
+    const a = new Audio(src);
+    a.preload = "auto";
+    a.cue = FightMedia.cue(src);
+    return a;
+  };
+  // Each file has its own sync mark. The gorilla also gets a low thud on contact.
   const vladPunches = [1, 2, 3].map(n => clip(`assets/sfx/vlad-punch-${n}.mp3`));
-  const BEAST_SFX = { peakMs: 170, clips: [1, 2].map(n => clip(`assets/sfx/gorilla-swing-${n}.mp3`)), last: -1,
+  const BEAST_SFX = { clips: [1, 2].map(n => clip(`assets/sfx/gorilla-swing-${n}.mp3`)), last: -1,
                       thud: { clips: vladPunches, rate: 0.72, volume: 0.95 } };
-  const SFX = { fighter: { peakMs: 0, clips: vladPunches, last: -1 }, gorilla: BEAST_SFX };
+  const SFX = { fighter: { clips: vladPunches, last: -1 }, gorilla: BEAST_SFX };
 
   /* A roster character's own sounds (roster `sfx`), in either corner: punches in place
      of Vlad's, a shout over the crit, a groan when the other side lands one, a cry when
@@ -901,18 +920,31 @@
   const clipOf = src => clips[src] || (clips[src] = clip(src));
   const VOICE = {};
   const activeVoices = new Set();
+  const voiceWaiters = new Set();
   let voiceGeneration = 0;
   function stopVoices() {
     voiceGeneration++;
+    voiceWaiters.clear();
     for (const a of activeVoices) { a.pause(); a.currentTime = 0; }
     activeVoices.clear();
+  }
+
+  function afterVoices(onDone) {
+    if (!activeVoices.size) onDone();
+    else voiceWaiters.add(onDone);
+  }
+
+  function notifyVoicesDone() {
+    if (activeVoices.size) return;
+    const callbacks = [...voiceWaiters];
+    voiceWaiters.clear();
+    callbacks.forEach(fn => fn());
   }
   function preloadVoice(side) {
     const c = CAST[side];
     const s = (c && c.sfx) || {};
     if (!c) SFX[side] = BEAST_SFX;
-    else SFX[side] = s.punch ? { peakMs: s.peakMs || 0, clips: s.punch.map(clipOf), last: -1 }
-                             : { peakMs: 0, clips: vladPunches, last: -1 };
+    else SFX[side] = { clips: s.punch ? s.punch.map(clipOf) : vladPunches, last: -1 };
     VOICE[side] = {
       hurt: { clips: (s.hurt || []).map(clipOf), last: -1 },
       win: { clips: (s.win || []).map(clipOf), last: -1 },
@@ -930,7 +962,9 @@
     let i = Math.floor(Math.random() * set.clips.length);
     if (i === set.last) i = (i + 1) % set.clips.length;
     set.last = i;
-    return set.clips[i].cloneNode();
+    const a = set.clips[i].cloneNode();
+    a.cue = set.clips[i].cue;
+    return a;
   }
 
   function playVoice(a, volume, ms, onDone) {
@@ -948,6 +982,7 @@
         a.removeEventListener("ended", finish);
         a.removeEventListener("error", finish);
         if (generation === voiceGeneration && onDone) onDone();
+        if (generation === voiceGeneration) notifyVoicesDone();
       };
       activeVoices.add(a);
       a.addEventListener("ended", finish, { once: true });
@@ -955,12 +990,11 @@
       a.play().catch(finish);
       // A stalled/missing file must not block the winner forever. Stop it before
       // advancing, so even the fallback cannot overlap the two reactions.
-      if (onDone) later(finish, 15000);
+      later(finish, 15000);
     }, ms);
   }
 
   function playResultVoices(winner) {
-    stopVoices(); // Stop any remaining hurt/crit reaction from the final blow.
     const generation = voiceGeneration;
     const loser = other(winner);
     const celebrate = () => {
@@ -969,51 +1003,67 @@
       if (!CAST[winner]) playVoice(gorillaWin.cloneNode(), 0.85, 0);
       else if (VOICE[winner].win.clips.length) playVoice(pick(VOICE[winner].win), 0.9, 0);
     };
-    if (VOLUME && VOICE[loser].lose.clips.length) {
-      playVoice(pick(VOICE[loser].lose), 0.9, 100, () => later(celebrate, 250));
-    } else if (VOLUME) later(celebrate, 450);
-    else celebrate();
+    // Let the final shout/hurt/effect finish before either result voice begins.
+    afterVoices(() => {
+      if (generation !== voiceGeneration) return;
+      if (VOLUME && VOICE[loser].lose.clips.length) {
+        playVoice(pick(VOICE[loser].lose), 0.9, 100, () => later(celebrate, FightMedia.RESULT_GAP_MS));
+      } else if (VOLUME) later(celebrate, 450);
+      else celebrate();
+    });
   }
 
   // Keep damage reactions behind the attack: 0.7 is about -3.1 dB.
   const HURT_LEVEL = 0.7;
 
-  /* Called as the attacker starts the dash; lines the clip's peak up with contact. */
-  function schedulePunch(hit) {
+  /* Schedule on the fight timeline, relative to the dash. Negative offsets are
+     intentional: a sound whose accent is late must start before the dash. */
+  function schedulePunch(hit, schedule) {
     const set = SFX[hit.by];
     if (!set || !VOLUME) return;
     // A character groans just after the other side's blow lands.
     const def = other(hit.by);
-    if (CAST[def] && VOICE[def].hurt.clips.length) playVoice(pick(VOICE[def].hurt), HURT_LEVEL * (hit.crit || hit.ko ? 0.95 : 0.8), TIMING.contact + 60);
+    if (CAST[def] && VOICE[def].hurt.clips.length) {
+      const hurt = pick(VOICE[def].hurt);
+      schedule(() => playVoice(hurt, HURT_LEVEL * (hit.crit || hit.ko ? 0.95 : 0.8), 0), TIMING.contact + 60);
+    }
     // The gorilla yelps when it is hit, whoever hits it: one clip, so the pitch
     // drifts a little; a crit or the KO lands it lower and louder.
     if (!CAST[def]) {
       const y = gorillaYelp.cloneNode();
       y.preservesPitch = false;
       y.playbackRate = hit.crit || hit.ko ? 0.88 : 0.95 + Math.random() * 0.12;
-      playVoice(y, HURT_LEVEL * (hit.crit || hit.ko ? 0.9 : 0.7), TIMING.contact + 50);
+      schedule(() => playVoice(y, HURT_LEVEL * (hit.crit || hit.ko ? 0.9 : 0.7), 0), TIMING.contact + 50);
     }
     // Never the same clip twice in a row, and a slight random pitch, so a run of
     // punches doesn't sound like one sample on repeat.
     const a = pick(set);
     // A crit or the KO lands heavier: full volume, pitched down.
     const heavy = hit.crit || hit.ko;
-    a.preservesPitch = false;
-    a.playbackRate = heavy ? 0.82 : 0.94 + Math.random() * 0.12;
-    a.volume = VOLUME * (heavy ? 1 : 0.85);
+    a.preservesPitch = !!a.cue?.voice;
+    a.playbackRate = a.cue?.voice ? 1 : heavy ? 0.82 : 0.94 + Math.random() * 0.12;
     // A slower clip reaches its peak later, so start it that much earlier.
-    later(() => {
-      // A browser tab blocks sound until the page is clicked; OBS plays it right away.
-      a.play().catch(() => {});
-    }, Math.max(0, TIMING.contact - set.peakMs / a.playbackRate));
+    // A crit has its own spoken line; do not layer a second Vlad line over it.
+    if (!(hit.crit && VOICE[hit.by].crit && a.cue?.voice)) {
+      schedule(() => playVoice(a, heavy ? 1 : 0.85, 0), TIMING.contact - (a.cue?.peakMs || 0) / a.playbackRate);
+    }
     if (set.thud) {
       const t = set.thud.clips[Math.floor(Math.random() * set.thud.clips.length)].cloneNode();
       t.preservesPitch = false;
       t.playbackRate = set.thud.rate * (heavy ? 0.9 : 0.97 + Math.random() * 0.06);
-      t.volume = VOLUME * set.thud.volume;
-      later(() => t.play().catch(() => {}), TIMING.contact);
+      schedule(() => playVoice(t, set.thud.volume, 0), TIMING.contact);
     }
-    later(() => duckMusic(hit.ko), TIMING.contact);
+    const crit = VOICE[hit.by].crit;
+    if (hit.crit && crit) {
+      schedule(() => playVoice(crit.cloneNode(), 0.95, 0), TIMING.contact - (crit.cue?.peakMs || 0));
+    }
+    if (!CAST[hit.by]) {
+      const roar = gorillaRoar.cloneNode();
+      roar.preservesPitch = false;
+      roar.playbackRate = heavy ? 0.9 : 0.95 + Math.random() * 0.1;
+      schedule(() => playVoice(roar, heavy ? 0.75 : 0.6, 0), TIMING.contact - 380);
+    }
+    schedule(() => duckMusic(hit.ko), TIMING.contact);
   }
 
   /* Fight music: from "FIGHT!" to just after the KO. The track is mastered loud
@@ -1089,12 +1139,11 @@
 
   /* One exchange: the attacker dashes in, the defender flashes and is knocked back.
      A crit lands harder: bigger number, red flash, full shake, longer knockback. */
-  function blow(hit, finalRound) {
+  function blow(hit, finalRound, elapsedMs = 0) {
     const atk = els[hit.by], def = els[other(hit.by)];
     atk.classList.remove("knock");
     def.classList.remove("crit");
     atk.classList.add("atk");
-    schedulePunch(hit);
     later(() => {
       def.classList.add("hit", "knock");
       def.classList.toggle("crit", !!hit.crit);
@@ -1109,12 +1158,12 @@
         if (!(finalRound && ANIM[side].defeat && ANIM[side].ready)) def.classList.add("defeated");
         else later(() => playDefeat(side), 150);
       }
-    }, TIMING.contact);
+    }, Math.max(0, TIMING.contact - elapsedMs));
     later(() => {
       atk.classList.remove("atk");
       def.classList.remove("hit");
       if (!hit.ko) def.classList.remove("knock", "crit");
-    }, hit.crit ? TIMING.recoverCrit : TIMING.recover);
+    }, Math.max(0, (hit.crit ? TIMING.recoverCrit : TIMING.recover) - elapsedMs));
   }
 
   const ROUND_SECONDS = 30;
@@ -1171,7 +1220,7 @@
     els.timer.textContent = String(roundTime(cur, elapsed));
     const prev = rounds[cur.n - 2];
     setPips(prev ? prev.score : null);
-    const landed = hits.filter(h => h.round === cur.n - 1 && h.at < elapsed);
+    const landed = hits.filter(h => h.round === cur.n - 1 && h.at + TIMING.contact <= elapsed);
     if (landed.length) {
       const h = landed[landed.length - 1];
       setHP("fighter", h.hp.fighter);
@@ -1194,21 +1243,20 @@
     });
     for (const h of hits) {
       at(h.at, () => blow(h, h.round === rounds.length - 1));
+      if (h.at < elapsed && elapsed < h.at + TIMING.contact) {
+        at(elapsed, () => blow(h, h.round === rounds.length - 1, elapsed - h.at));
+      }
       // Each blow is the attacker's attack clip: start it early so it lands on contact.
-      // A character's crit shout starts with the clip, its loudest on the blow.
-      at(h.at + TIMING.contact - clipFor(h).contactMs, () => {
-        attackStart(h);
-        if (h.crit && VOICE[h.by].crit) playVoice(VOICE[h.by].crit.cloneNode(), 0.95, 0);
-        // The gorilla roars as it swings: the roar peaks ~180 ms in, 200 ms before the blow.
-        if (!CAST[h.by]) {
-          const r = gorillaRoar.cloneNode();
-          r.preservesPitch = false;
-          r.playbackRate = h.crit || h.ko ? 0.9 : 0.95 + Math.random() * 0.1;
-          playVoice(r, h.crit || h.ko ? 0.75 : 0.6, Math.max(0, clipFor(h).contactMs - 380));
-        }
-      });
+      const clipStart = h.at + TIMING.contact - clipFor(h).contactMs;
+      at(clipStart, () => attackStart(h));
+      // A late join can land inside the wind-up: show its current frame, not idle.
+      if (clipStart < elapsed && elapsed < h.at + TIMING.contact) {
+        at(elapsed, () => attackStart(h, elapsed - clipStart));
+      }
+      schedulePunch(h, (fn, offset) => at(h.at + offset, fn));
     }
-    for (const [t, fn] of events) later(fn, t - elapsed);
+    const origin = performance.now() - elapsed;
+    for (const [t, fn] of events.sort((a, b) => a[0] - b[0])) later(fn, Math.max(0, origin + t - performance.now()));
 
     // Music runs under the whole fight, coming in after the first gong; an
     // overlay that joins late picks it up in place.
@@ -1216,7 +1264,12 @@
     if (elapsed < musicAt) later(() => startMusic(0), musicAt - elapsed);
     else startMusic(elapsed - musicAt);
 
-    if (autoRestore) later(resetIdle, script.reveal - elapsed + TIMING.restore);
+    if (autoRestore) later(resetIdle, script.reveal - elapsed + Math.max(TIMING.restore,
+      FightMedia.resultHoldMs(script, characterId("fighter"), characterId("gorilla"))));
+  }
+
+  function characterId(side) {
+    return Object.entries(Roster.CHARACTERS).find(([, c]) => c === CAST[side])?.[0] || "gorilla";
   }
 
   const JOIN_LATE_MS = 400;
@@ -1228,7 +1281,8 @@
     playFight(script, true);
     // The next fight once this one's result has had its moment (fights run 23-35 s).
     clearTimeout(demoTimer);
-    demoTimer = setTimeout(() => demoFight(), script.reveal + TIMING.restore + 1500);
+    const hold = Math.max(TIMING.restore, FightMedia.resultHoldMs(script, characterId("fighter"), characterId("gorilla")));
+    demoTimer = setTimeout(() => demoFight(), script.reveal + hold + 1500);
   }
 
   function skipFight() {

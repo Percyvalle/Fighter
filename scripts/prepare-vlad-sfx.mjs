@@ -1,4 +1,4 @@
-/* Usage: node scripts/prepare-vlad-sfx.mjs "path/to/Влад Звуки"
+/* Usage: node scripts/prepare-vlad-sfx.mjs "path/to/Влад Звуки" [output-name]
    Requires ffmpeg. Only generates named assets; source recordings stay intact. */
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
@@ -7,13 +7,14 @@ import { fileURLToPath } from 'node:url';
 const source = process.argv[2];
 if (!source) throw new Error('Pass the directory containing Влад Звуки as the first argument');
 const output = resolve(dirname(fileURLToPath(import.meta.url)), '../public/assets/sfx');
-// Ordinary attacks use only approved review variants A and C. Their MP3 encoding,
-// tempo and fades match the approved audio-review variants.
+// A and C keep the approved review encoding, tempo and fades. The original punch
+// keeps its full spoken phrase at natural speed, with silence trimmed at the edges.
 // atempo fits speech into the action without pitch shift.
 // Hurt recordings have long silent gaps between separate reactions.
 const cuts = [
   ['Звук удара 2.ogg', 'vlad-attack-a', 0.48, 1.18, 0.8, 1.05, true],
   ['Звук удара 2.ogg', 'vlad-attack-c', 2.34, 3.28, 0.8, 1.4, true],
+  ['Звук удара.ogg', 'vlad-attack-original', 0.56, 1.70, 2, 1, true],
   ['Крит Удар.ogg', 'vlad-crit-complete', 0.40, 2.24, -0.7, 1.4],
   ['Получение урона.ogg', 'vlad-hurt-1', 0.55, 0.90, 10.1],
   ['Получение урона.ogg', 'vlad-hurt-2', 1.43, 1.83, 10.1],
@@ -26,15 +27,19 @@ const cuts = [
   ['Звук поражения.ogg', 'vlad-defeat', 0.47, 3.56, 0.1],
 ];
 
-for (const [file, name, start, end, gain, tempo = 1, approved = false] of cuts) {
+const only = process.argv[3];
+const selected = only ? cuts.filter(([, name]) => name === only) : cuts;
+if (!selected.length) throw new Error(`Unknown output name: ${only}`);
+
+for (const [file, name, start, end, gain, tempo = 1, mp3 = false] of selected) {
   const duration = (end - start) / tempo;
-  const fadeIn = approved ? 0.005 : 0.008;
-  const fadeOut = approved ? 0.015 : 0.025;
-  const extension = approved ? 'mp3' : 'ogg';
+  const fadeIn = mp3 ? 0.005 : 0.008;
+  const fadeOut = mp3 ? 0.015 : 0.025;
+  const extension = mp3 ? 'mp3' : 'ogg';
   const result = spawnSync('ffmpeg', [
     '-hide_banner', '-loglevel', 'error', '-y', '-i', resolve(source, file),
     '-af', `atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS,atempo=${tempo},volume=${gain}dB,afade=t=in:d=${fadeIn},afade=t=out:st=${duration - fadeOut}:d=${fadeOut}`,
-    '-c:a', approved ? 'libmp3lame' : 'libopus', '-b:a', approved ? '128k' : '96k', resolve(output, `${name}.${extension}`),
+    '-c:a', mp3 ? 'libmp3lame' : 'libopus', '-b:a', mp3 ? '128k' : '96k', resolve(output, `${name}.${extension}`),
   ], { stdio: 'inherit' });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`ffmpeg failed for ${file}`);

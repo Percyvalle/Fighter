@@ -27,7 +27,7 @@ const DEFAULTS = {
     opponent: 'gorilla',    // кто стоит справа: 'gorilla' или id из public/js/roster.js
     characters: {},         // свои имена персонажей: { "fighter2": "ИМЯ" }
     voteSeconds: 30,        // сколько идёт голосование перед боем
-    resultSeconds: 6,       // сколько висит экран победителя
+    resultSeconds: 6,       // минимум: длинные реплики/анимации продлевают показ
     autoLoop: false,        // после результата сразу открывать новое голосование
     pauseSeconds: 10,       // пауза между раундами в autoLoop
     minVotes: 0,            // таймер голосования стоит, пока не наберётся столько голосов

@@ -43,9 +43,11 @@
   /* layout */
   .grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; }
   .grid > .card { display: flex; flex-direction: column; }
-  .grid.dashboard { align-items: start; }
+  .grid.dashboard { align-items: stretch; }
   .panel-column { display: grid; gap: 22px; align-content: start; min-width: 0; }
   .panel-column > .card { display: flex; flex-direction: column; min-width: 0; }
+  .dashboard > .panel-column:first-child { display: flex; flex-direction: column; }
+  .dashboard > .panel-column:first-child > .card:last-child { flex: 1; }
   .sidebar { display: grid; gap: 18px; align-content: start; min-width: 0; }
   .sidebar .card { min-width: 0; }
   .card .note:last-child, .card .linkrow:last-child { margin-top: auto; }
@@ -322,6 +324,14 @@
         <button id="b-flood" class="sm" type="button">случайных голосов</button>
       </div>
     </section>
+
+    <section class="card">
+      <div class="card-h">
+        <h2>Голоса</h2>
+        <span class="count">в этом бою: <b id="v-count">0</b></span>
+      </div>
+      <div id="voters"></div>
+    </section>
     </div>
 
     <div class="panel-column sidebar">
@@ -391,17 +401,6 @@
         <a class="alt" href="/overlay.html?solo=1" target="_blank">Демо без хоста ↗</a>
       </div>
     </section>
-    </div>
-  </div>
-
-  <div class="grid">
-    <section class="card">
-      <div class="card-h">
-        <h2>Голоса</h2>
-        <span class="count">в этом бою: <b id="v-count">0</b></span>
-      </div>
-      <div id="voters"></div>
-    </section>
 
     <section class="card">
       <div class="card-h">
@@ -414,6 +413,7 @@
       </div>
       <div id="history"></div>
     </section>
+    </div>
   </div>
 
   <section class="card">
