@@ -9,8 +9,8 @@ COPY public ./public
 COPY index.html ./index.html
 
 RUN mkdir -p /app/data
-# Start from the safe template; deployment values can override it through .env.
-COPY docs/config/config.example.json ./data/config.json
+# Start with no channels configured. Environment variables enable the selected chats.
+RUN printf '{}\n' > /app/data/config.json
 
 EXPOSE 7778
 VOLUME ["/app/data"]

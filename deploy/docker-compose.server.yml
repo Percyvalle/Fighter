@@ -1,0 +1,9 @@
+services:
+  fight:
+    networks:
+      - fight-proxy
+
+networks:
+  fight-proxy:
+    external: true
+    name: fight-proxy
