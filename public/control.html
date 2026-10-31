@@ -1,4 +1,4 @@
-<title>Файтинг — панель</title>
+<title>Fighter — панель</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -422,7 +422,7 @@ function renderSession(s) {
   if (s.names) {
     names = s.names;
     document.querySelectorAll('[data-name]').forEach(el => el.textContent = names[el.dataset.name]);
-    document.title = `${names.fighter} vs ${names.gorilla} — панель`;
+      document.title = `Fighter — ${names.fighter} vs ${names.gorilla}`;
   }
   if (roundChanged) { voters.clear(); votersTouch(); }
 

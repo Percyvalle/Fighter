@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Влад vs Горилла — overlay</title>
+<title>Fighter — overlay</title>
 <style>
   :root {
     --hp-red: #d10a0a;
@@ -645,7 +645,7 @@
     if (!names) return;
     NAMES = names;
     document.querySelectorAll("[data-name]").forEach(el => el.textContent = NAMES[el.dataset.name]);
-    document.title = `${NAMES.fighter} vs ${NAMES.gorilla} — overlay`;
+    document.title = `Fighter — ${NAMES.fighter} vs ${NAMES.gorilla}`;
   }
 
   const other = side => side === "fighter" ? "gorilla" : "fighter";
