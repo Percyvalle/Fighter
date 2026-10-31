@@ -19,86 +19,75 @@
   const STEP_MS = 1300;     // between exchanges
   const JITTER_MS = 150;
   const KO_HOLD_MS = 700;   // the KO lands, then the round is over
-  const MAX_STREAK = 2;     // blows in a row by the same side
-  // Least blows per side, the round winner's KO included, so it swings both ways.
-  const MIN_WINNER = 3;
-  const MIN_LOSER = 2;
+  const NEUTRAL_HITS = 4;
 
   // Crits: any blow, the KO included, can crit. A crit takes a visibly bigger bite
   // than every ordinary blow of the same round, so viewers can tell them apart.
-  const CRIT_PCT = 18;      // chance per blow: ~1.2 crits a round, about 3 rounds in 4 have one
+  const CRIT_PCT = 18;
   const MAX_CRITS = 3;      // per round, so they stay special
   const NORMAL_MAX = 30;    // no ordinary blow takes more than ~a third of the bar
   const CRIT_MIN = 26;
   const CRIT_MAX = 48;
   const CRIT_GAP = 4;       // a crit beats the round's biggest ordinary blow by at least this
-  const CRIT_WEIGHT = 3;    // share of the damage budget a crit draws vs an ordinary blow
 
   const other = side => side === 'fighter' ? 'gorilla' : 'fighter';
 
-  /* Split `total` into integer parts of at least `min` each, sized by `mult`. */
-  function split(total, mult, min, rand) {
-    const k = mult.length;
-    // Wide weights, so two blows rarely come out the same number.
-    const w = mult.map(m => (4 + rand(9)) * m);
-    const sum = w.reduce((a, b) => a + b, 0);
-    const spare = total - k * min;
-    const parts = w.map(x => min + Math.floor(spare * x / sum));
-    parts[k - 1] += total - parts.reduce((a, b) => a + b, 0);
-    return parts;
-  }
-
-  function plausible(hits) {
-    const normal = hits.filter(h => !h.crit).map(h => h.dmg);
-    const crits = hits.filter(h => h.crit).map(h => h.dmg);
-    const top = Math.max(0, ...normal);
-    return top <= NORMAL_MAX
-      && crits.every(d => d >= CRIT_MIN && d <= CRIT_MAX && d >= top + CRIT_GAP);
-  }
-
   /* One round won by `winner`; times are from that round's "FIGHT!". */
   function makeRound(winner, rand) {
-    // Crits are rolled once, up front: re-rolling them inside the rejection loop
-    // would quietly favour crit-heavy rounds, since those fit the damage budget easier.
-    let crit;
+    // The opening is sampled without consulting the winner. Both fighters land
+    // twice and finish within KO reach, so either can still take this round.
+    let opening;
     do {
-      crit = Array.from({ length: HITS }, () => rand(100) < CRIT_PCT);
-    } while (crit.filter(Boolean).length > MAX_CRITS);
+      const by = [SIDES[0], SIDES[0], SIDES[1], SIDES[1]];
+      for (let i = by.length - 1; i > 0; i--) {
+        const j = rand(i + 1);
+        [by[i], by[j]] = [by[j], by[i]];
+      }
+      opening = by.map(side => {
+        const crit = rand(100) < CRIT_PCT;
+        return { by: side, crit, dmg: crit ? 34 + rand(9) : 23 + rand(8) };
+      });
+    } while (SIDES.some(side => {
+      const left = 100 - opening.filter(h => h.by === other(side)).reduce((n, h) => n + h.dmg, 0);
+      return left < 35 || left > 52;
+    }) || opening.filter(h => h.crit).length > MAX_CRITS);
 
-    // Rejection sampling: cheap (a handful of tries on average) and keeps every blow plausible.
-    for (;;) {
-      const s = attempt(winner, rand, crit);
-      if (plausible(s.hits)) return s;
-    }
-  }
-
-  function attempt(winner, rand, crit) {
     const loser = other(winner);
-
-    // Who lands each blow. The last is always the winner's KO; each side lands at
-    // least MIN_WINNER / MIN_LOSER, and nobody lands more than MAX_STREAK in a row
-    // (the KO included), so the round swings both ways instead of one side pummelling.
-    let by;
-    do {
-      by = [...Array.from({ length: HITS - 1 }, () => SIDES[rand(2)]), winner];
-    } while (by.filter(s => s === winner).length < MIN_WINNER || by.filter(s => s === loser).length < MIN_LOSER
-      || by.some((s, i) => i >= MAX_STREAK && by.slice(i - MAX_STREAK, i).every(p => p === s)));
-
-    const winnerLeft = 15 + rand(31);
-    // The KO finishes a loser who is already low, rather than one-shotting a full bar;
-    // a critical KO may finish from further out.
-    const ko = crit[HITS - 1] ? 26 + rand(15) : 12 + rand(11);
-    const multOf = side => by.map((s, i) => [s, i]).filter(([s, i]) => s === side && i < HITS - 1)
-      .map(([, i]) => crit[i] ? CRIT_WEIGHT : 1);
-    const toLoser = [...split(100 - ko, multOf(winner), 8, rand), ko];
-    const toWinner = split(100 - winnerLeft, multOf(loser), 6, rand);
-
+    const left = 100 - opening.filter(h => h.by === winner).reduce((n, h) => n + h.dmg, 0);
+    const topNormal = Math.max(0, ...opening.filter(h => !h.crit).map(h => h.dmg));
+    const critCount = opening.filter(h => h.crit).length;
+    // Pick the two finishing blows together. A normal KO takes 12–22 HP;
+    // a critical KO may finish from farther out. Every critical blow still
+    // exceeds every ordinary blow in this round by at least CRIT_GAP.
+    const finishes = [];
+    for (const firstCrit of [false, true]) for (const koCrit of [false, true]) {
+      if (critCount + Number(firstCrit) + Number(koCrit) > MAX_CRITS) continue;
+      for (let ko = koCrit ? CRIT_MIN : 12; ko <= (koCrit ? 40 : 22); ko++) {
+        const first = left - ko;
+        if (first < (firstCrit ? CRIT_MIN : 8) || first > (firstCrit ? CRIT_MAX : NORMAL_MAX)) continue;
+        const normalTop = Math.max(topNormal, firstCrit ? 0 : first, koCrit ? 0 : ko);
+        if (opening.some(h => h.crit && h.dmg < normalTop + CRIT_GAP)) continue;
+        if (firstCrit && first < normalTop + CRIT_GAP) continue;
+        if (koCrit && ko < normalTop + CRIT_GAP) continue;
+        finishes.push({ first, firstCrit, ko, koCrit });
+      }
+    }
+    const wantedFirstCrit = rand(100) < CRIT_PCT;
+    const wantedKoCrit = rand(100) < CRIT_PCT;
+    const preferred = finishes.filter(f => f.firstCrit === wantedFirstCrit && f.koCrit === wantedKoCrit);
+    const fallback = finishes.filter(f => !f.firstCrit && !f.koCrit);
+    const finish = (preferred.length ? preferred : fallback.length ? fallback : finishes)[rand((preferred.length || fallback.length || finishes.length))];
+    const lastSide = opening[NEUTRAL_HITS - 1].by;
+    const middle = { by: loser, crit: false, dmg: 8 + rand(13) };
+    const end = [{ by: winner, crit: finish.firstCrit, dmg: finish.first }, middle,
+      { by: winner, crit: finish.koCrit, dmg: finish.ko }];
+    if (lastSide === winner) [end[0], end[1]] = [end[1], end[0]];
+    const blows = [...opening, ...end];
     const hp = { fighter: 100, gorilla: 100 };
-    const hits = by.map((side, i) => {
-      const dmg = side === winner ? toLoser.shift() : toWinner.shift();
-      hp[other(side)] = Math.max(0, hp[other(side)] - dmg);
+    const hits = blows.map(({ by, dmg, crit }, i) => {
+      hp[other(by)] = Math.max(0, hp[other(by)] - dmg);
       const jitter = i === HITS - 1 ? 0 : rand(2 * JITTER_MS + 1) - JITTER_MS;
-      return { at: FIRST_MS + i * STEP_MS + jitter, by: side, dmg, crit: crit[i], hp: { ...hp }, ko: i === HITS - 1 };
+      return { at: FIRST_MS + i * STEP_MS + jitter, by, dmg, crit, hp: { ...hp }, ko: i === HITS - 1 };
     });
 
     return { hits, length: hits[hits.length - 1].at + KO_HOLD_MS };

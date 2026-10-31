@@ -36,6 +36,29 @@ test('fight scripts always end in the requested winner with a valid best-of-thre
   }
 });
 
+test('round openings reveal no information about the requested winner', () => {
+  for (let seed = 1; seed <= 500; seed++) {
+    const fighter = FightScript.make('fighter', rng(seed));
+    const gorilla = FightScript.make('gorilla', rng(seed));
+    const opening = script => script.hits.slice(0, 4).map(({ by, dmg, crit, hp }) => ({ by, dmg, crit, hp }));
+    assert.deepEqual(opening(fighter), opening(gorilla));
+    for (const script of [fighter, gorilla]) {
+      for (const round of script.rounds) {
+        const hits = script.hits.filter(hit => hit.round === round.n - 1);
+        const topNormal = Math.max(...hits.filter(hit => !hit.crit).map(hit => hit.dmg));
+        assert.equal(hits.at(-1).by, round.winner);
+        assert.equal(hits.at(-1).hp[round.winner === 'fighter' ? 'gorilla' : 'fighter'], 0);
+        assert.ok(hits.slice(0, 4).every(hit => hit.hp.fighter >= 35 && hit.hp.gorilla >= 35));
+        assert.ok(hits[3].hp.fighter <= 52 && hits[3].hp.gorilla <= 52);
+        assert.ok(hits.slice(0, -1).every(hit => hit.hp.fighter > 0 && hit.hp.gorilla > 0));
+        assert.ok(hits.every((hit, i) => i < 2 || hits[i - 1].by !== hit.by || hits[i - 2].by !== hit.by));
+        assert.ok(hits.filter(hit => hit.crit).length <= 3);
+        assert.ok(hits.filter(hit => hit.crit).every(hit => hit.dmg >= topNormal + 4));
+      }
+    }
+  }
+});
+
 test('points double a winning stake and wipe a losing stake', () => {
   const points = new Points({ start: 100 });
   points.join('twitch:alice', 'Alice', 'twitch');
