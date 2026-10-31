@@ -43,6 +43,8 @@
   /* layout */
   .grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; }
   .grid > .card { display: flex; flex-direction: column; }
+  .sidebar { display: grid; gap: 18px; align-content: start; min-width: 0; }
+  .sidebar .card { min-width: 0; }
   .card .note:last-child, .card .linkrow:last-child { margin-top: auto; }
   @media (max-width: 880px) { .grid { grid-template-columns: minmax(0,1fr); } }
 
@@ -96,6 +98,14 @@
   .setting button.sm { height: 34px; }
   .setting.toggle { padding: 0 14px 0 12px; cursor: pointer; }
   .setting.toggle input { accent-color: var(--fire); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+  .fight-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .fight-settings .setting { display: grid; height: auto; min-width: 0; gap: 6px; padding: 9px 10px; }
+  .fight-settings .setting select { width: 100%; min-width: 0; }
+  .fight-settings #series-box { grid-template-columns: minmax(0, 1fr) auto; }
+  .fight-settings #series-box label { grid-column: 1 / -1; }
+  .fight-settings #series { width: 100%; }
+  .fight-settings .setting.toggle { display: flex; grid-column: 1 / -1; min-height: 42px; }
+  @media (max-width: 420px) { .fight-settings { grid-template-columns: minmax(0, 1fr); } }
 
   .opts { display: grid; gap: 10px; }
   .opt { display: grid; gap: 7px; padding: 10px 12px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
@@ -118,17 +128,19 @@
   .dot.connected { background: var(--ok); box-shadow: 0 0 8px rgba(127,240,196,.7); }
   .dot.connecting, .dot.reconnecting { background: var(--warn); box-shadow: 0 0 8px rgba(255,211,107,.5); animation: blink 1.2s infinite; }
   .dot.error { background: var(--bad); box-shadow: 0 0 8px rgba(255,90,72,.6); }
-  #platforms { display: grid; gap: 12px; flex: 1; grid-auto-rows: 1fr; }
-  .plat { display: grid; gap: 8px; padding: 12px 14px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
-  .plat .name { font-weight: 600; font-size: 17px; white-space: nowrap; }
+  .platform-card { padding: 16px 18px; gap: 12px; }
+  .platform-card .note { font-size: 11.5px; line-height: 1.45; padding: 8px 10px; }
+  #platforms { display: grid; gap: 8px; }
+  .plat { display: grid; gap: 6px; padding: 9px 10px; background: var(--well); border: 1px solid var(--line); border-radius: 10px; }
+  .plat .name { font-weight: 600; font-size: 15px; white-space: nowrap; }
   .plat-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .plat-l { display: flex; align-items: center; gap: 9px; flex: none; }
   .plat-r { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; }
-  .plat-r button.sm { padding: 7px 13px; font-size: 13.5px; }
+  .plat-r button.sm { padding: 5px 9px; font-size: 12px; }
   .plat-r input.claim { padding: 6px 10px; font-size: 13px; border-radius: 8px; width: 11ch; }
-  .plat-r .tag { font-size: 12px; padding: 6px 11px; border-radius: 8px; }
-  .plat .detail { display: grid; align-content: center; gap: 3px; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,.02); border: 1px solid var(--line); font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); word-break: break-word; }
-  .plat .st { font-family: var(--f-mono); font-size: 14px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .plat-r .tag { font-size: 10.5px; padding: 4px 7px; border-radius: 7px; }
+  .plat .detail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 9px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+  .plat .st { font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .plat .st.connected { color: var(--ok); }
   .plat .st.connecting, .plat .st.reconnecting { color: var(--warn); }
   .plat .st.error { color: var(--bad); }
@@ -256,7 +268,20 @@
           <button id="b-skip" class="ghost" type="button" title="Отменить текущий бой, ничего не записывая">Отменить бой</button>
         </div>
       </div>
-      <div class="row">
+      <div class="opts" id="opts"></div>
+      <div id="result" hidden></div>
+    </section>
+
+    <div class="sidebar">
+    <section class="card platform-card">
+      <div class="card-h"><h2>Платформы</h2></div>
+      <div id="platforms"></div>
+      <div class="note">Чтение работает и без авторизации (Twitch — анонимно). Авторизация нужна, чтобы бот <b>писал</b> в чат: объявлял голосование и победителя.</div>
+    </section>
+
+    <section class="card" aria-labelledby="fight-settings-title">
+      <div class="card-h"><h2 id="fight-settings-title">Настройки боя</h2></div>
+      <div class="fight-settings">
         <div class="setting" id="char-box" title="Кто стоит слева (!1). Меняется, пока не идут ставки и бой.">
           <label for="char">Персонаж</label>
           <select id="char"></select>
@@ -278,15 +303,8 @@
           <input type="checkbox" id="auto"> Автоповтор боёв
         </label>
       </div>
-      <div class="opts" id="opts"></div>
-      <div id="result" hidden></div>
     </section>
-
-    <section class="card">
-      <div class="card-h"><h2>Платформы</h2></div>
-      <div id="platforms"></div>
-      <div class="note">Чтение работает и без авторизации (Twitch — анонимно). Авторизация нужна, чтобы бот <b>писал</b> в чат: объявлял голосование и победителя.</div>
-    </section>
+    </div>
 
     <section class="card">
       <div class="card-h"><h2>Тестовое сообщение</h2></div>
