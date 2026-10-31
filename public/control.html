@@ -43,6 +43,9 @@
   /* layout */
   .grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; }
   .grid > .card { display: flex; flex-direction: column; }
+  .grid.dashboard { align-items: start; }
+  .panel-column { display: grid; gap: 22px; align-content: start; min-width: 0; }
+  .panel-column > .card { display: flex; flex-direction: column; min-width: 0; }
   .sidebar { display: grid; gap: 18px; align-content: start; min-width: 0; }
   .sidebar .card { min-width: 0; }
   .card .note:last-child, .card .linkrow:last-child { margin-top: auto; }
@@ -275,7 +278,8 @@
     </div>
   </header>
 
-  <div class="grid">
+  <div class="grid dashboard">
+    <div class="panel-column">
     <section class="card hero">
       <div class="card-h"><h2>Бой</h2></div>
       <div class="stat">
@@ -295,7 +299,32 @@
       <div id="result" hidden></div>
     </section>
 
-    <div class="sidebar">
+    <section class="card">
+      <div class="card-h"><h2>Тестовое сообщение</h2></div>
+      <div class="sub">Прогоняет весь путь «чат → роутер → оверлей» без живого чата.</div>
+      <div class="field">
+        <select id="i-plat"><option value="local">local</option><option value="twitch">twitch</option><option value="kick">kick</option></select>
+        <input id="i-nick" class="grow" placeholder="ник" value="tester" size="8">
+      </div>
+      <div class="send">
+        <input id="i-text" class="grow" placeholder="!1" value="!1">
+        <button id="b-inject" class="primary" type="button">Отправить</button>
+      </div>
+      <div class="row tight">
+        <button class="chip" data-fill="!1" type="button">!1</button>
+        <button class="chip" data-fill="!2" type="button">!2</button>
+        <button class="chip" data-fill="!3" type="button">!3</button>
+        <button class="chip" data-fill="!join" type="button">!join</button>
+      </div>
+      <div class="flood">
+        <label for="i-n">Пачкой</label>
+        <input id="i-n" type="number" value="25" min="1" max="500">
+        <button id="b-flood" class="sm" type="button">случайных голосов</button>
+      </div>
+    </section>
+    </div>
+
+    <div class="panel-column sidebar">
     <section class="card platform-card">
       <div class="card-h"><h2>Платформы</h2></div>
       <div id="platforms"></div>
@@ -348,31 +377,6 @@
       </form>
       </details>
     </section>
-    </div>
-
-    <section class="card">
-      <div class="card-h"><h2>Тестовое сообщение</h2></div>
-      <div class="sub">Прогоняет весь путь «чат → роутер → оверлей» без живого чата.</div>
-      <div class="field">
-        <select id="i-plat"><option value="local">local</option><option value="twitch">twitch</option><option value="kick">kick</option></select>
-        <input id="i-nick" class="grow" placeholder="ник" value="tester" size="8">
-      </div>
-      <div class="send">
-        <input id="i-text" class="grow" placeholder="!1" value="!1">
-        <button id="b-inject" class="primary" type="button">Отправить</button>
-      </div>
-      <div class="row tight">
-        <button class="chip" data-fill="!1" type="button">!1</button>
-        <button class="chip" data-fill="!2" type="button">!2</button>
-        <button class="chip" data-fill="!3" type="button">!3</button>
-        <button class="chip" data-fill="!join" type="button">!join</button>
-      </div>
-      <div class="flood">
-        <label for="i-n">Пачкой</label>
-        <input id="i-n" type="number" value="25" min="1" max="500">
-        <button id="b-flood" class="sm" type="button">случайных голосов</button>
-      </div>
-    </section>
 
     <section class="card">
       <div class="card-h"><h2>Ссылки и команды</h2></div>
@@ -387,6 +391,7 @@
         <a class="alt" href="/overlay.html?solo=1" target="_blank">Демо без хоста ↗</a>
       </div>
     </section>
+    </div>
   </div>
 
   <div class="grid">
