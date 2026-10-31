@@ -126,7 +126,7 @@ export function loadConfig() {
   } else {
     log.warn(`${path} not found — running on defaults (no channels configured)`);
   }
-  const cfg = fromEnv(deepMerge(DEFAULTS, file));
+  const cfg = fromEnv(deepMerge(structuredClone(DEFAULTS), file));
 
   cfg.host = String(cfg.host || DEFAULTS.host).trim();
   cfg.publicUrl = String(cfg.publicUrl || '').trim().replace(/\/+$/, '');

@@ -249,6 +249,14 @@ const server = createServer(async (req, res) => {
         case 'series': session.setSeries(b.value); break;
         case 'voteSeconds': session.setVoteSeconds(b.value); break;
         case 'auto': session.setAuto(b.value); break;
+        case 'antiStreak': {
+          try { session.setAntiStreak(b.value); }
+          catch (e) {
+            if (!e.status) log.error(`cannot save anti-streak settings: ${e.message}`);
+            return json(res, e.status || 500, { ok: false, error: e.status ? e.message : 'Не удалось сохранить настройки. Проверьте доступ к файлу конфигурации.' });
+          }
+          break;
+        }
         case 'say': if (b.platform) outbox.say(b.platform, String(b.value || '').slice(0, 400)); break;
         case 'reconnect': {
           const a = adapters.get(b.platform);

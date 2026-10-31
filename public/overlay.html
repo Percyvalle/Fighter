@@ -536,7 +536,7 @@
       </div>
     </div>
 
-    <div class="timer" id="timer">99</div>
+    <div class="timer" id="timer">30</div>
 
     <div class="player p2">
       <div class="hp-frame">
@@ -1030,7 +1030,7 @@
   let musicFade = null, duckTimer = null, musicStopping = false;
 
   /* The opening gong rings out on "FIGHT!"; the music comes in under its tail. */
-  const GONG_LEVEL = 0.55;
+  const GONG_LEVEL = 0.4;
   const MUSIC_DELAY_MS = 600;
   const gong = new Audio("assets/sfx/gong.mp3");
   gong.preload = "auto";
@@ -1105,7 +1105,6 @@
       els.impact.classList.toggle("crit", !!hit.crit);
       if (hit.dmg >= 18 || hit.ko || hit.crit) retrigger(els.impact, "on");
       if (hit.ko) {
-        els.timer.textContent = "KO";
         const side = other(hit.by);
         if (!(finalRound && ANIM[side].defeat && ANIM[side].ready)) def.classList.add("defeated");
         else later(() => playDefeat(side), 150);
@@ -1118,14 +1117,21 @@
     }, hit.crit ? TIMING.recoverCrit : TIMING.recover);
   }
 
+  const ROUND_SECONDS = 30;
+
   /* Fresh bars and stances for round `r`; `quiet` skips the "ROUND N" banner
      (an overlay that joins after it was shown). */
   function startRound(r, quiet) {
     resetIdle();
     setHP("fighter", 100);
     setHP("gorilla", 100);
-    els.timer.textContent = String(Math.ceil((r.ko - r.fight) / 1000));
+    els.timer.textContent = String(ROUND_SECONDS);
     if (!quiet) showBanner(`ROUND ${r.n}`, "flash long");
+  }
+
+  function roundTime(r, elapsed) {
+    const played = Math.max(0, Math.min(elapsed, r.ko) - r.fight);
+    return Math.max(0, ROUND_SECONDS - Math.floor(played / 1000));
   }
 
   /* After a round's KO: light the winner's pip; the last round ends the fight. */
@@ -1156,11 +1162,13 @@
     const { rounds, hits } = script;
     const lastRound = rounds[rounds.length - 1];
     const finalHp = hits[hits.length - 1].hp;
+    els.timer.classList.remove("urgent");
 
     // Rebuild where the fight stands right now: the round in progress, the pips
     // for rounds already decided, the bars as of the last blow landed.
     const cur = [...rounds].reverse().find(r => r.start <= elapsed) || rounds[0];
     startRound(cur, elapsed > 0);
+    els.timer.textContent = String(roundTime(cur, elapsed));
     const prev = rounds[cur.n - 2];
     setPips(prev ? prev.score : null);
     const landed = hits.filter(h => h.round === cur.n - 1 && h.at < elapsed);
@@ -1168,7 +1176,7 @@
       const h = landed[landed.length - 1];
       setHP("fighter", h.hp.fighter);
       setHP("gorilla", h.hp.gorilla);
-      if (h.ko) { els[other(h.by)].classList.add("defeated"); els.timer.textContent = "KO"; }
+      if (h.ko) els[other(h.by)].classList.add("defeated");
     }
 
     // Everything still to come, on one timeline.
@@ -1177,10 +1185,10 @@
     rounds.forEach((r, i) => {
       if (i > 0) at(r.start, () => startRound(r, false));
       at(r.fight, () => { showBanner("FIGHT!", "flash"); playGong(); });
-      // Countdown to this round's KO in the timer box.
-      for (let t = r.fight + 1000; t < r.ko; t += 1000) {
-        const left = Math.ceil((r.ko - t) / 1000);
-        at(t, () => { if (els.timer.textContent !== "KO") els.timer.textContent = String(left); });
+      // The round clock starts at 30 and freezes on KO, regardless of when KO occurs.
+      for (let seconds = 1; seconds <= ROUND_SECONDS && r.fight + seconds * 1000 < r.ko; seconds++) {
+        const t = r.fight + seconds * 1000;
+        at(t, () => { els.timer.textContent = String(ROUND_SECONDS - seconds); });
       }
       at(r.end, () => endRound(r, r === lastRound, finalHp));
     });
@@ -1230,7 +1238,7 @@
     setPips(null);
     setHP("fighter", 100);
     setHP("gorilla", 100);
-    els.timer.textContent = "99";
+    els.timer.textContent = String(ROUND_SECONDS);
     els.timer.classList.remove("urgent");
   }
 

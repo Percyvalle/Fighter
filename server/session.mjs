@@ -9,6 +9,7 @@
 import { randomInt } from 'node:crypto';
 import { logger } from './log.mjs';
 import { clampVote } from './config.mjs';
+import { saveAntiStreak, validateAntiStreak } from './streak-settings.mjs';
 import '../public/js/fight.js';
 import '../public/js/roster.js';
 
@@ -16,8 +17,9 @@ const log = logger('session');
 const { FightScript, Roster } = globalThis;
 
 export class Session {
-  constructor({ cfg, hub, outbox, points }) {
+  constructor({ cfg, hub, outbox, points, persistAntiStreak = saveAntiStreak }) {
     this.cfg = cfg; this.hub = hub; this.outbox = outbox; this.points = points;
+    this.persistAntiStreak = persistAntiStreak;
     this.voteSeconds = cfg.game.voteSeconds;
     this.autoLoop = cfg.game.autoLoop;
     this.phase = 'idle';
@@ -322,6 +324,17 @@ export class Session {
     this.broadcast();
   }
 
+  setAntiStreak(value) {
+    if (this.phase === 'voting' || this.phase === 'fight') {
+      throw Object.assign(new Error('Защиту можно менять только между боями — когда нет ставок и боя.'), { status: 409 });
+    }
+    const chances = validateAntiStreak(value);
+    this.persistAntiStreak(chances); // Failure must leave the active rules unchanged.
+    this.cfg.game.antiStreak = chances;
+    log.info(`anti-streak: ${chances.length ? chances.join(' / ') + '%' : 'off (50/50)'}`);
+    this.broadcast();
+  }
+
   setAuto(on) {
     this.autoLoop = !!on;
     if (!this.autoLoop && this.phase === 'pause') { this.phase = 'idle'; this.endsAt = 0; }
@@ -363,6 +376,7 @@ export class Session {
       gorilla: this.gorillaName,
       voteSeconds: this.voteSeconds,
       autoLoop: this.autoLoop,
+      antiStreak: [...this.cfg.game.antiStreak],
       left: this.left(),
       waiting: this.phase === 'voting' && !this.endsAt,
       minVotes: this.cfg.game.minVotes,
