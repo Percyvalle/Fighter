@@ -16,8 +16,9 @@
      head      where the head is across the box, for the damage numbers
      sfx       optional: own sounds — `punch` clips in place of Vlad's,
                `crit` a shout anchored to contact (see fight-media.js),
-               `hurt` groans when the gorilla lands a blow, `win` one of them when
-               they win the fight, `lose` a reaction to losing the whole fight
+               `hurt` groans when the other side lands a blow, `win` default
+               victory clips, `winVs` victory clips keyed by opponent ID (replaces
+               `win` for that opponent), `lose` a reaction to losing the fight
      label     optional: how the panel's picker shows them, when two characters
                share a name (Paver in white and in red) */
 (function (root) {
@@ -27,7 +28,8 @@
     punch: [1, 2, 3].map(n => `assets/sfx/paver-punch-${n}.ogg`),
     crit: 'assets/sfx/paver-crit.ogg',
     hurt: [1, 2, 3].map(n => `assets/sfx/paver-hurt-${n}.ogg`),
-    win: [1, 2].map(n => `assets/sfx/paver-win-${n}.ogg`),
+    win: ['assets/sfx/paver-win-1.ogg'],
+    winVs: { gorilla: ['assets/sfx/paver-win-2.ogg'] },
   };
 
   const CHARACTERS = {
@@ -84,5 +86,10 @@
     },
   };
 
-  root.Roster = { CHARACTERS, DEFAULT: 'vlad' };
+  function winSounds(characterId, opponentId) {
+    const sfx = CHARACTERS[characterId]?.sfx;
+    return sfx?.winVs?.[opponentId] ?? sfx?.win ?? [];
+  }
+
+  root.Roster = { CHARACTERS, DEFAULT: 'vlad', winSounds };
 })(typeof window !== 'undefined' ? window : globalThis);

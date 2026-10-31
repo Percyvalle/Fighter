@@ -69,7 +69,9 @@
     const wait = Math.max(0, reactionTailMs(hit, cast[hit.by], cast[loser]) - afterContact);
     const lose = maxDuration(cast[loser]?.sfx?.lose);
     const celebrateAt = wait + (lose ? 100 + lose + RESULT_GAP_MS : 450);
-    const victory = cast[script.winner] ? maxDuration(cast[script.winner].sfx?.win) : 4084;
+    const winnerId = script.winner === 'fighter' ? character : opponent;
+    const loserId = script.winner === 'fighter' ? opponent : character;
+    const victory = cast[script.winner] ? maxDuration(root.Roster.winSounds(winnerId, loserId)) : 4084;
     const defeat = cast[loser]?.defeat ? Math.max(0, 150 + 5917 - afterContact) : 0;
     // A small margin covers frame boundaries and normal media startup latency.
     return Math.ceil(Math.max(celebrateAt + victory, defeat) + 350);

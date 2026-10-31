@@ -92,7 +92,8 @@ test('joining during a dash keeps the original impact time', () => {
 test('every active roster sound has a measured duration and attack anchor', () => {
   for (const c of Object.values(Roster.CHARACTERS)) {
     for (const [kind, sounds] of Object.entries(c.sfx || {})) {
-      for (const src of [sounds].flat()) {
+      const sources = kind === 'winVs' ? Object.values(sounds).flat() : [sounds].flat();
+      for (const src of sources) {
         const timing = FightMedia.cue(src);
         assert.ok(timing.durationMs > 0, `missing duration for ${src}`);
         if (kind === 'punch' || kind === 'crit') {
@@ -101,6 +102,15 @@ test('every active roster sound has a measured duration and attack anchor', () =
       }
     }
   }
+});
+
+test('result hold uses the victory line for the actual opponent', () => {
+  const script = { winner: 'fighter', reveal: 1700,
+    hits: [{ at: 1000, by: 'fighter', crit: false, ko: true }] };
+  assert.deepEqual(Roster.winSounds('fighter2', 'gorilla'), ['assets/sfx/paver-win-2.ogg']);
+  assert.deepEqual(Roster.winSounds('fighter2', 'vlad'), ['assets/sfx/paver-win-1.ogg']);
+  assert.ok(FightMedia.resultHoldMs(script, 'fighter2', 'gorilla') >
+    FightMedia.resultHoldMs(script, 'fighter2', 'fighter3'));
 });
 
 test('auto-loop budgets the whole Vlad defeat and gorilla victory, in both corners', () => {

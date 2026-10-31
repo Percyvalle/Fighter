@@ -40,6 +40,8 @@ function audioScene(search = '', autoEnd = false) {
     showResult() {}, shake() {}, stopMusic() {}, setPips() {},
     playVictory(side) { victories.push({ side, startedAt: now }); }, duckMusic() {},
   });
+  context.characterId = side => Object.entries(Roster.CHARACTERS)
+    .find(([, character]) => character === context.CAST[side])?.[0] || 'gorilla';
   runInContext(section('  /* ---------- sound ---------- */', '  /* Fight music:'), context);
   runInContext(section('  function endRound(', '  /**\n   * Play a fight script'), context);
   runInContext(section('  function clearPending()', '  // Restart a CSS animation'), context);
@@ -97,6 +99,28 @@ test('Vlad sounds follow him into the right corner', () => {
   scene.played[0].emit('ended');
   advance(scene);
   assert.ok(scene.played.some(a => a.src === 'assets/sfx/vlad-win.ogg'));
+});
+
+test('Paver uses the gorilla-specific victory line only against the gorilla', () => {
+  for (const paver of ['fighter2', 'fighter3']) {
+    for (const [opponent, expected] of [
+      ['gorilla', 'paver-win-2.ogg'],
+      ['vlad', 'paver-win-1.ogg'],
+      ['fighter2', 'paver-win-1.ogg'],
+    ]) {
+      if (paver === opponent) continue;
+      const scene = audioScene('', true);
+      runInContext(`
+        CAST.fighter = Roster.CHARACTERS[${JSON.stringify(paver)}];
+        CAST.gorilla = Roster.CHARACTERS[${JSON.stringify(opponent)}] || null;
+        preloadVoice('fighter'); preloadVoice('gorilla');
+        playResultVoices('fighter');
+      `, scene.context);
+      scene.advanceTo(10000);
+      assert.ok(scene.played.some(a => a.src === `assets/sfx/${expected}`), `${paver} vs ${opponent}`);
+      assert.ok(!scene.played.some(a => /paver-win-/.test(a.src) && !a.src.endsWith(expected)));
+    }
+  }
 });
 
 test('mute suppresses reactions and cancellation stops a playing reaction', () => {
