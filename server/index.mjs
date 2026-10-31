@@ -19,9 +19,15 @@ import { RelayAdapter } from './adapters/relay.mjs';
 import { hasTokens, clearTokens } from './oauth/store.mjs';
 import { authorizeUrl, handleCallback } from './oauth/flows.mjs';
 import { readiness } from './health.mjs';
+import { isPublicRoute, validBasicAuth } from './access.mjs';
 
 const log = logger('host');
 const cfg = loadConfig();
+const adminUser = process.env.FIGHT_ADMIN_USER || '';
+const adminPassword = process.env.FIGHT_ADMIN_PASSWORD || '';
+if (cfg.publicUrl && process.env.NODE_ENV === 'production' && (!adminUser || !adminPassword)) {
+  throw new Error('set FIGHT_ADMIN_USER and FIGHT_ADMIN_PASSWORD for a public deployment');
+}
 
 const hub = new Hub();
 const outbox = new Outbox({ cfg });
@@ -174,6 +180,16 @@ const server = createServer(async (req, res) => {
     if (p !== '/webhooks/kick' && !isLocalRequest(req)) {
       log.warn(`отклонён внешний запрос ${req.method} ${p} (host=${req.headers.host || '-'}${req.headers.origin ? ', origin=' + req.headers.origin : ''})`);
       return send(res, 403, 'text/plain', 'forbidden: host is not configured for this origin');
+    }
+
+    if (adminUser && adminPassword && !isPublicRoute(req.method, p, url.searchParams.get('role'))
+        && !validBasicAuth(req.headers.authorization, adminUser, adminPassword)) {
+      res.writeHead(401, {
+        'www-authenticate': 'Basic realm="Fighter control", charset="UTF-8"',
+        'cache-control': 'no-store',
+      });
+      res.end('authentication required');
+      return;
     }
 
     if (req.method === 'GET' && p === '/healthz') {

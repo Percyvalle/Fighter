@@ -1,9 +1,15 @@
 services:
   fight:
-    networks:
-      - fight-proxy
+    networks: [fight]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      fight:
+        condition: service_started
+    networks: [fight]
 
 networks:
-  fight-proxy:
-    external: true
-    name: fight-proxy
+  fight:
