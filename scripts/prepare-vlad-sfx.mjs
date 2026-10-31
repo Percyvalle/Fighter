@@ -8,7 +8,7 @@ const source = process.argv[2];
 if (!source) throw new Error('Pass the directory containing Влад Звуки as the first argument');
 const output = resolve(dirname(fileURLToPath(import.meta.url)), '../public/assets/sfx');
 // Ordinary attacks use only approved review variants A and C. Their MP3 encoding,
-// tempo and fades match the approval previews from prepare-vlad-review.mjs.
+// tempo and fades match the approved audio-review variants.
 // atempo fits speech into the action without pitch shift.
 // Hurt recordings have long silent gaps between separate reactions.
 const cuts = [
