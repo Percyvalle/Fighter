@@ -1,0 +1,16 @@
+{
+  "name": "fight-host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local host bridging Twitch and Kick chat votes into the fighting stream overlay",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test"
+  }
+}

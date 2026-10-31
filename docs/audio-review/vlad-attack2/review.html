@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Влад — варианты второго звука на согласование</title>
+<style>
+  body{font:17px/1.6 system-ui,sans-serif;max-width:920px;margin:40px auto;padding:0 22px;background:#10171c;color:#e5edf3}
+  h1{font-size:27px}h2{font-size:21px;margin-bottom:8px}p{color:#c5d0d9}
+  section{border:1px solid #36454e;border-radius:12px;padding:18px 22px;margin:18px 0}
+  audio{width:100%}label{display:block;margin:14px 0 6px}strong{color:#72e0d0}
+  .wave{position:relative;background:#071015;margin:16px 0}.wave img{width:100%;display:block}
+  .slice{position:absolute;top:0;bottom:0;border-left:2px solid #ffcf72;background:#ffcf7215;font-size:13px;color:#ffcf72;padding-left:5px;box-sizing:border-box}
+  .note{font-size:14px;color:#acbdc9}
+</style>
+<h1>Влад: второй звук атаки</h1>
+<p>Кандидаты для прослушивания. В игру пока не подключены. Границы выбраны по затишьям в сигнале; это не подтверждённые границы слов. Проверьте, не пропадают ли начало или конец слова.</p>
+<section>
+  <h2>Полный исходник — 3,81 с</h2>
+  <audio controls preload="metadata" src="source.mp3"></audio>
+  <div class="wave"><img src="waveform.png" alt="Амплитуда полной записи">
+    <span class="slice" style="left:12.61%;width:18.39%">A</span>
+    <span class="slice" style="left:31%;width:30.47%">B</span>
+    <span class="slice" style="left:61.47%;width:24.69%">C</span>
+  </div>
+  <p class="note">Время исходника: 0 → 3,81 с. Паузы около 1,11–1,20 с и 2,06–2,42 с зависят от порога громкости; тихие звуки в них сохраняются.</p>
+</section>
+<section>
+  <h2>A — начало: 0,48–1,18 с</h2>
+  <p>Минимальное ускорение. Правая граница находится в коротком затишье: нужно проверить окончание слова.</p>
+  <label>Исходная скорость — около 0,70 с</label><audio controls preload="metadata" src="a-natural.mp3"></audio>
+  <label>Под удар — около 0,67 с, ускорение 1,05×</label><audio controls preload="metadata" src="a-fit.mp3"></audio>
+</section>
+<section>
+  <h2>B — середина: 1,18–2,34 с</h2>
+  <p>Самый рискованный вариант: начало может продолжать слово из A. Чтобы уложиться в обычный удар, требуется заметное ускорение.</p>
+  <label>Исходная скорость — около 1,16 с</label><audio controls preload="metadata" src="b-natural.mp3"></audio>
+  <label>Под удар — около 0,68 с, ускорение 1,70×</label><audio controls preload="metadata" src="b-fit.mp3"></audio>
+</section>
+<section>
+  <h2>C — окончание: 2,34–3,28 с</h2>
+  <p><strong>Первым предлагаю проверить C.</strong> Сохранён конец записи с запасом тишины. Точка начала расположена в затишье перед последним участком; нужно подтвердить, что это самостоятельный выкрик.</p>
+  <label>Исходная скорость — около 0,94 с</label><audio controls preload="metadata" src="c-natural.mp3"></audio>
+  <label>Под удар — около 0,67 с, ускорение 1,40×</label><audio controls preload="metadata" src="c-fit.mp3"></audio>
+</section>
+<p>Во всех ускоренных версиях используется atempo, сохраняющий тон. Длительности приблизительные: MP3 добавляет небольшой запас. На тяжёлом ударе игра дополнительно замедляет эффект до 0,82×.</p>
+<p>Для согласования: выберите A, B или C и скорость; либо отметьте, где слышен обрыв. Если все части режут слова, целую запись лучше оставить для более длинного действия.</p>
+</html>

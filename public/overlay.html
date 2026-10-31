@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Влад vs Горилла — overlay</title>
+<style>
+  :root {
+    --hp-red: #d10a0a;
+    --hp-orange: #ff8a00;
+    --hp-yellow: #ffd23f;
+    --frame: #ffffff;
+    --ink: #0b0b12;
+    --reach: 34vw;   /* how far the attacker dashes in: fist to body at 16:9 */
+    /* a roster character's dashes come from public/js/roster.js, set on its corner */
+    --reach-swing: 37vw; /* gorilla's attack dash: swung fist to Vlad at 16:9 */
+    --reach-slam: 37vw;  /* gorilla's crit dash: the ground slam lands at Vlad's feet */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", "Arial Black", sans-serif;
+    color: #fff;
+    user-select: none;
+  }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    position: fixed;
+    inset: 0;
+    /* Gradient is a fallback while assets/bg.jpg is missing */
+    background:
+      url("assets/bg.jpg") center / cover no-repeat,
+      radial-gradient(ellipse at 50% 35%, #4a1a12 0%, #1c0a0a 55%, #070305 100%);
+  }
+
+  /* Dark vignette for depth */
+  .stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 55%,
+      rgba(0, 0, 0, 0) 40%,
+      rgba(0, 0, 0, 0.55) 75%,
+      rgba(0, 0, 0, 0.9) 100%);
+    z-index: 5;
+  }
+
+  /* ---------- Characters ---------- */
+  /* Outer wrapper handles lunges/knockback, inner img handles idle,
+     so the two transforms never fight each other. */
+  .fighter-wrap {
+    position: absolute;
+    bottom: 4vh;
+    height: min(72vh, 95vw);
+    z-index: 3;
+    transition: transform 0.18s cubic-bezier(.2, .9, .3, 1.3), opacity 0.4s ease;
+  }
+  .fighter-wrap.left  { left: 4vw; }
+  .fighter-wrap.right { right: 4vw; }
+
+  /* Same height for both; width follows each image's own aspect ratio */
+  #fighter, #gorilla { height: min(72vh, 95vw); }
+
+  /* gorilla PNG has transparent padding (visible figure = 959 of 1152px, 48px empty
+     at the bottom) while the fighter fills his PNG; enlarge the gorilla image so the
+     visible bodies match. The enlarged image overflows the wrap downward by 19.6%,
+     so lift it back up, leaving only the ~5% bottom padding below the wrap edge
+     so the feet land exactly on the ground line */
+  #gorilla > .sprite { height: 119.6%; }
+  #gorilla > .still {
+    position: relative;
+    bottom: 14.6%;
+  }
+
+  /* Contact shadow on the ground */
+  .fighter-wrap::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -1.2vh;
+    width: 70%;
+    height: 4vh;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 70%);
+    z-index: -1;
+  }
+
+  .fighter-wrap .sprite {
+    display: block;
+    height: 100%;
+    width: auto;
+    max-width: 46vw;
+    object-fit: contain;
+    object-position: bottom;
+    transform-origin: 50% 100%;
+    filter:
+      drop-shadow(0 18px 14px rgba(0, 0, 0, 0.65))
+      drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+  }
+
+  .fighter-wrap.left .sprite { animation: idle 2.4s ease-in-out infinite; }
+  .fighter-wrap.right .sprite { animation: idle 3.1s ease-in-out -0.8s infinite; }
+
+  /* A roster character (public/js/roster.js, built by setCharacter) in its corner's
+     .cast: the still, and the clips each on the same canvas as the still, so they sit
+     exactly on top of it. The still stays underneath as the layout box and as the
+     fallback if video fails. In the right corner the gorilla's own art is hidden and
+     the character is mirrored: every clip faces right. */
+  .cast { position: relative; height: 100%; }
+  #gorilla .cast { transform: scaleX(-1); }
+  #gorilla:not(.rival) .cast, #gorilla.rival > .sprite { display: none; }
+  .fighter-wrap .cast .anim { position: absolute; left: 0; bottom: 0; visibility: hidden; animation: none; }
+  .cast.has-anim .still { visibility: hidden; }
+  .cast.has-anim .clip-idle { visibility: visible; }
+  .fighter-wrap.kicking .cast .clip-idle { visibility: hidden; }
+  .fighter-wrap.kicking .cast .clip-crit { visibility: visible; }
+  .fighter-wrap.punching .cast .clip-idle { visibility: hidden; }
+  .fighter-wrap.punching .cast .clip-attack { visibility: visible; }
+  .fighter-wrap.losing .cast .clip-idle { visibility: hidden; }
+  .fighter-wrap.losing .cast .clip-defeat { visibility: visible; }
+
+  /* The gorilla's idle video has the same padding as gorilla.png (same art at 0.946),
+     so it gets the same enlargement; absolute, its foot line is the still's: 5% below
+     the wrap edge. */
+  #gorilla > .anim { position: absolute; left: 0; bottom: -5%; visibility: hidden; animation: none; }
+  #gorilla.has-anim > .still { visibility: hidden; }
+  #gorilla.has-anim #gorilla-idle { visibility: visible; }
+  #gorilla.striking #gorilla-idle { visibility: hidden; }
+  #gorilla.striking #gorilla-attack { visibility: visible; }
+  #gorilla.slamming #gorilla-idle { visibility: hidden; }
+  #gorilla.slamming #gorilla-crit { visibility: visible; }
+  #gorilla.cheering #gorilla-idle { visibility: hidden; }
+  #gorilla.cheering #gorilla-win { visibility: visible; }
+
+  @keyframes idle {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50%      { transform: translateY(-1.2%) scaleY(1.012); }
+  }
+
+  /* Attack / result states */
+  #fighter.atk { transform: translateX(var(--reach)) skewX(-5deg); }
+  #fighter.atk.kicking { transform: translateX(var(--reach-kick)); }
+  #fighter.atk.punching { transform: translateX(var(--reach-punch)); }
+  /* The plain dash overshoots its target by ~10% (the 1.3 in its curve) for a snappy
+     lunge. With a real attack clip that overshoot carried the fist ~60 px into the
+     gorilla's face just before contact, so these dashes settle without it. */
+  #fighter.atk.punching, #fighter.atk.kicking, #gorilla.atk.punching, #gorilla.atk.kicking,
+  #gorilla.atk.striking, #gorilla.atk.slamming { transition-timing-function: cubic-bezier(.2, .9, .3, 1); }
+  #gorilla.atk { transform: translateX(calc(var(--reach) * -1)) skewX(5deg); }
+  #gorilla.atk.striking { transform: translateX(calc(var(--reach-swing) * -1)); }
+  #gorilla.atk.slamming { transform: translateX(calc(var(--reach-slam) * -1)); }
+  #gorilla.atk.punching { transform: translateX(calc(var(--reach-punch) * -1)); }
+  #gorilla.atk.kicking { transform: translateX(calc(var(--reach-kick) * -1)); }
+  #fighter.knock { transform: translateX(-2.5vw) rotate(-2deg); }
+  #gorilla.knock { transform: translateX(2.5vw) rotate(2deg); }
+
+  .fighter-wrap.hit .sprite { filter: drop-shadow(0 18px 14px rgba(0,0,0,0.65)) brightness(2.2) saturate(0.3); }
+
+  #fighter.defeated { opacity: 0.3; transform: translateX(-3vw) rotate(-4deg); }
+  #gorilla.defeated { opacity: 0.3; transform: translateX(3vw) rotate(4deg); }
+  .fighter-wrap.defeated .sprite { animation-play-state: paused; filter: grayscale(0.8) drop-shadow(0 18px 14px rgba(0,0,0,0.65)); }
+
+  .fighter-wrap.victor .sprite { filter: drop-shadow(0 18px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(255, 190, 60, 0.8)); }
+
+  /* ---------- Top HUD ---------- */
+  .hud {
+    position: fixed;
+    top: 3vh;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2vw;
+    padding: 0 3vw;
+    z-index: 10;
+  }
+
+  .player {
+    flex: 1;
+    max-width: 40vw;
+  }
+
+  .hp-frame {
+    position: relative;
+    height: clamp(18px, 4vh, 40px);
+    border: 3px solid var(--frame);
+    background: linear-gradient(#2a0000, #100000);
+    transform: skewX(-20deg);
+    box-shadow: 0 0 0 2px var(--ink), 0 6px 18px rgba(0, 0, 0, 0.7), inset 0 0 10px rgba(0,0,0,0.8);
+    overflow: hidden;
+  }
+  .player.p2 .hp-frame { transform: skewX(20deg); }
+
+  .hp-fill, .hp-lag {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+  .p1 .hp-fill, .p1 .hp-lag { right: 0; }   /* P1 drains toward the center */
+  .p2 .hp-fill, .p2 .hp-lag { left: 0; }
+
+  .hp-lag {
+    background: #fff4c2;
+    transition: width 0.9s ease 0.35s;
+  }
+  .hp-fill {
+    background: linear-gradient(180deg, var(--hp-yellow) 0%, var(--hp-orange) 35%, var(--hp-red) 100%);
+    transition: width 0.25s ease-out;
+  }
+  .p1 .hp-fill { background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%),
+      linear-gradient(270deg, var(--hp-yellow) 0%, var(--hp-orange) 40%, var(--hp-red) 100%); }
+  .p2 .hp-fill { background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%),
+      linear-gradient(90deg, var(--hp-yellow) 0%, var(--hp-orange) 40%, var(--hp-red) 100%); }
+
+  .player-name {
+    margin-top: 0.8vh;
+    font-size: clamp(14px, 2.4vh, 28px);
+    letter-spacing: 0.12em;
+    font-style: italic;
+    text-shadow: 2px 2px 0 var(--ink), 0 0 10px rgba(0,0,0,0.8);
+  }
+  .p2 .player-name { text-align: right; }
+
+  /* Name and won-round pips under each bar; pips sit toward the centre, as in MK */
+  .player-meta { display: flex; align-items: center; justify-content: space-between; gap: 1vw; }
+  .p2 .player-meta { flex-direction: row-reverse; }
+  .pips { display: flex; gap: 0.6vw; margin-top: 0.8vh; }
+  .p1 .pips { flex-direction: row-reverse; }
+  .pip {
+    width: clamp(12px, 2vh, 22px);
+    height: clamp(12px, 2vh, 22px);
+    transform: rotate(45deg);
+    border: 2px solid var(--frame);
+    background: rgba(20, 0, 0, 0.75);
+    box-shadow: 0 0 0 2px var(--ink);
+    transition: background 0.2s;
+  }
+  .pip.won {
+    background: radial-gradient(circle at 35% 35%, #fff9d6, var(--hp-yellow) 40%, var(--hp-orange) 75%, var(--hp-red));
+    box-shadow: 0 0 0 2px var(--ink), 0 0 14px rgba(255, 190, 60, 0.9);
+    animation: pip-pop 0.45s cubic-bezier(.2, 1.8, .4, 1);
+  }
+  @keyframes pip-pop {
+    0% { transform: rotate(45deg) scale(2.2); }
+    100% { transform: rotate(45deg) scale(1); }
+  }
+
+  .timer {
+    flex: 0 0 auto;
+    min-width: clamp(50px, 8vh, 90px);
+    margin-top: -1vh;
+    text-align: center;
+    font-size: clamp(32px, 7vh, 80px);
+    line-height: 1;
+    color: #fff;
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 0 4px 0 #b30000, 0 0 18px rgba(255, 120, 0, 0.6);
+    font-variant-numeric: tabular-nums;
+  }
+  .timer.urgent { color: var(--hp-yellow); animation: pulse 1s ease-in-out infinite; }
+
+  /* Series counter under the timer: "БОЙ 3/20" */
+  .series {
+    position: fixed;
+    top: calc(3vh + clamp(32px, 7vh, 80px) + 2.4vh);   /* below the round pips */
+    left: 50%;
+    z-index: 10;
+    transform: translateX(-50%) skewX(-12deg);
+    padding: 0.2em 0.9em 0.25em;
+    white-space: nowrap;
+    font-size: clamp(12px, 2.1vh, 24px);
+    letter-spacing: 0.1em;
+    font-style: italic;
+    background: rgba(10, 10, 18, 0.85);
+    border: 2px solid var(--frame);
+    box-shadow: 0 0 0 2px var(--ink), 0 6px 16px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .series[hidden] { display: none; }
+  .series b { color: var(--hp-yellow); font-weight: normal; }
+  .series.last { border-color: var(--hp-yellow); }
+  @keyframes pulse { 50% { transform: scale(1.12); } }
+
+  /* ---------- Center banner ---------- */
+  .banner {
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+    z-index: 20;
+    white-space: nowrap;
+    font-size: clamp(40px, 12vw, 180px);
+    font-style: italic;
+    letter-spacing: 0.04em;
+    /* The gradient is clipped to the glyphs but painted only over the box; italic
+       glyphs lean out past its edges, so without this padding the trailing "!"
+       was left unfilled (just its outline). */
+    padding: 0 0.3em;
+    background: linear-gradient(180deg, #fff9d6 0%, #ffd23f 35%, #ff7a00 65%, #c40000 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 3px var(--ink);
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.85)) drop-shadow(0 0 30px rgba(255, 100, 0, 0.55));
+    pointer-events: none;
+  }
+  .banner.show { animation: slam 0.45s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+  .banner.show.park { animation: slam 0.45s cubic-bezier(.2, 1.6, .4, 1) forwards, park 0.5s ease-in-out 1.2s forwards; }
+  .banner.flash { animation: flash 0.7s ease-out forwards; }
+  .banner.flash.long { animation-duration: 1.15s; }   /* "ROUND N" */
+
+  /* 42% -> ~24% of the screen, at a bit over half size: under the series counter */
+  @keyframes park {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(-10deg); }
+    to   { opacity: 1; transform: translate(-50%, calc(-50% - 18vh)) scale(0.55) skewX(-10deg); }
+  }
+  @keyframes slam {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(2.6) skewX(-10deg); }
+    60%  { opacity: 1; transform: translate(-50%, -50%) scale(0.92) skewX(-10deg); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(-10deg); }
+  }
+  @keyframes flash {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6) skewX(-10deg); }
+    25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05) skewX(-10deg); }
+    75%  { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(-10deg); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3) skewX(-10deg); }
+  }
+
+  /* Line under the banner: how many viewers guessed */
+  .subline {
+    position: fixed;
+    top: calc(24% + clamp(18px, 4vw, 64px));
+    left: 50%;
+    z-index: 20;
+    transform: translateX(-50%) skewX(-10deg);
+    padding: 0.4em 1.2em;
+    white-space: nowrap;
+    font-size: clamp(16px, 3.2vh, 38px);
+    letter-spacing: 0.08em;
+    background: rgba(10, 10, 18, 0.85);
+    border: 2px solid var(--frame);
+    box-shadow: 0 0 0 2px var(--ink), 0 8px 24px rgba(0,0,0,0.7);
+    opacity: 0;
+    transition: opacity 0.3s ease 1.6s;
+    pointer-events: none;
+  }
+  .subline.on { opacity: 1; }
+  .subline b { color: var(--hp-yellow); font-weight: normal; }
+
+  /* Impact flash */
+  .impact {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at 50% 60%, rgba(255,255,255,0.9) 0%, rgba(255,200,80,0.35) 25%, rgba(0,0,0,0) 55%);
+  }
+  .impact.on { animation: impact 0.3s ease-out; }
+  .impact.crit {
+    background: radial-gradient(circle at 50% 60%, rgba(255,255,255,0.95) 0%, rgba(255,60,0,0.5) 30%, rgba(120,0,0,0.35) 60%, rgba(0,0,0,0) 85%);
+  }
+  .impact.crit.on { animation-duration: 0.5s; }
+  @keyframes impact {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* A crit throws the defender further back */
+  #fighter.knock.crit { transform: translateX(-6vw) rotate(-5deg); }
+  #gorilla.knock.crit { transform: translateX(6vw) rotate(5deg); }
+
+  /* Damage numbers over the defender's head */
+  .dmg {
+    position: fixed;
+    z-index: 18;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 0.95;
+    font-size: clamp(22px, 5vh, 56px);
+    font-style: italic;
+    color: #fff;
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 0 4px 0 rgba(0,0,0,0.8);
+    animation: dmg-float 0.9s ease-out forwards;
+  }
+  .dmg.crit {
+    font-size: clamp(34px, 8vh, 96px);
+    color: var(--hp-yellow);
+    -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 0 5px 0 #b30000, 0 0 24px rgba(255, 80, 0, 0.9);
+    animation: dmg-crit 1.2s cubic-bezier(.2, 1.5, .4, 1) forwards;
+  }
+  .dmg.crit small {
+    display: block;
+    font-size: 0.55em;
+    letter-spacing: 0.1em;
+    color: #fff;
+    text-shadow: 0 3px 0 #b30000, 0 0 14px rgba(255, 60, 0, 0.9);
+  }
+  @keyframes dmg-float {
+    0%   { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+    15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    70%  { opacity: 1; transform: translate(-50%, -110%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+  }
+  @keyframes dmg-crit {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(2.4) rotate(-8deg); }
+    20%  { opacity: 1; transform: translate(-50%, -50%) scale(0.95) rotate(-8deg); }
+    75%  { opacity: 1; transform: translate(-50%, -80%) scale(1) rotate(-8deg); }
+    100% { opacity: 0; transform: translate(-50%, -120%) scale(1) rotate(-8deg); }
+  }
+
+  /* ---------- Bottom commands ---------- */
+  .commands-holder {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 2.5vh;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1vh;
+    pointer-events: none;
+  }
+
+  .caption {
+    font-size: clamp(13px, 2.4vh, 28px);
+    letter-spacing: 0.12em;
+    font-style: italic;
+    color: #fff;
+    text-shadow: 2px 2px 0 var(--ink), 0 0 12px rgba(0,0,0,0.9);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .caption.on { opacity: 1; }
+  .caption b { color: var(--hp-yellow); font-weight: normal; }
+
+  .commands {
+    transform: skewX(-15deg);
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.6vw, 28px);
+    padding: clamp(6px, 1.2vh, 14px) clamp(14px, 2.5vw, 40px);
+    background: linear-gradient(90deg, rgba(160,0,0,0.85), rgba(10,10,18,0.9) 30%, rgba(10,10,18,0.9) 70%, rgba(160,0,0,0.85));
+    border: 2px solid var(--frame);
+    box-shadow: 0 0 0 2px var(--ink), 0 8px 24px rgba(0,0,0,0.7);
+    white-space: nowrap;
+    font-size: clamp(12px, 2.6vh, 30px);
+    letter-spacing: 0.08em;
+  }
+  .commands > * { transform: skewX(15deg); }
+  .commands .cmd { color: var(--hp-yellow); text-shadow: 0 0 8px rgba(255, 180, 0, 0.6); }
+  .commands .sep { color: rgba(255,255,255,0.4); }
+
+  /* Live vote share under each option, shown while voting */
+  .opt { position: relative; padding-bottom: 0.35em; }
+  .opt .cnt { display: none; margin-left: 0.4em; color: #fff; font-weight: normal; font-variant-numeric: tabular-nums; }
+  .opt .meter {
+    position: absolute; left: 0; bottom: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--hp-orange), var(--hp-yellow));
+    box-shadow: 0 0 8px rgba(255, 180, 0, 0.7);
+    transition: width 0.3s ease-out;
+  }
+  .commands:not(.live) .meter { opacity: 0; }
+  .commands.live .cnt { display: inline; }
+
+  /* ---------- Screen shake ---------- */
+  body.shake .stage,
+  body.shake .hud,
+  body.shake .commands-holder { animation: shake 0.45s cubic-bezier(.36, .07, .19, .97) both; }
+  /* light blows get a smaller shake */
+  body.shake.soft .stage,
+  body.shake.soft .hud,
+  body.shake.soft .commands-holder { animation-name: shake-soft; animation-duration: 0.3s; }
+
+  @keyframes shake-soft {
+    25%, 75% { transform: translate(-4px, 2px); }
+    50% { transform: translate(4px, -2px); }
+  }
+
+  @keyframes shake {
+    10%, 90% { transform: translate(-2px, 1px); }
+    20%, 80% { transform: translate(5px, -3px); }
+    30%, 50%, 70% { transform: translate(-9px, 4px) rotate(-0.4deg); }
+    40%, 60% { transform: translate(9px, -4px) rotate(0.4deg); }
+  }
+
+  @media (max-aspect-ratio: 1/1) {
+    :root { --reach: 20vw; }
+    .fighter-wrap { bottom: 10vh; }
+    #fighter, #gorilla { height: 48vh; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="fighter-wrap left" id="fighter">
+      <div class="cast"><img class="sprite still" src="assets/fighter.png" alt=""></div>
+    </div>
+    <div class="fighter-wrap right" id="gorilla">
+      <img class="sprite still" src="assets/gorilla.png" alt="">
+      <video class="sprite anim" id="gorilla-idle" src="assets/anim/gorilla-idle.webm" muted loop autoplay playsinline preload="auto"></video>
+      <video class="sprite anim" id="gorilla-attack" src="assets/anim/gorilla-attack.webm" muted playsinline preload="auto"></video>
+      <video class="sprite anim" id="gorilla-crit" src="assets/anim/gorilla-crit.webm" muted playsinline preload="auto"></video>
+      <video class="sprite anim" id="gorilla-win" src="assets/anim/gorilla-win.webm" muted playsinline preload="auto"></video>
+      <div class="cast"><img class="sprite still" alt=""></div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="player p1">
+      <div class="hp-frame">
+        <div class="hp-lag" id="hp-lag-fighter"></div>
+        <div class="hp-fill" id="hp-fighter"></div>
+      </div>
+      <div class="player-meta">
+        <div class="player-name" data-name="fighter">ВЛАД</div>
+        <div class="pips" id="pips-fighter"></div>
+      </div>
+    </div>
+
+    <div class="timer" id="timer">99</div>
+
+    <div class="player p2">
+      <div class="hp-frame">
+        <div class="hp-lag" id="hp-lag-gorilla"></div>
+        <div class="hp-fill" id="hp-gorilla"></div>
+      </div>
+      <div class="player-meta">
+        <div class="player-name" data-name="gorilla">ГОРИЛЛА</div>
+        <div class="pips" id="pips-gorilla"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="series" id="series" hidden></div>
+
+  <div class="impact" id="impact"></div>
+  <div class="banner" id="banner"></div>
+  <div class="subline" id="subline"></div>
+
+  <div class="commands-holder">
+    <div class="caption" id="caption"></div>
+    <div class="commands" id="commands">
+      <span class="opt"><span class="cmd">!1</span> - <span data-name="fighter">ВЛАД</span><b class="cnt" id="cnt-1"></b><i class="meter" id="meter-1"></i></span>
+      <span class="sep">|</span>
+      <span class="opt"><span class="cmd">!2</span> - <span data-name="gorilla">ГОРИЛЛА</span><b class="cnt" id="cnt-2"></b><i class="meter" id="meter-2"></i></span>
+      <span class="sep">|</span>
+      <span class="opt"><span class="cmd">!3</span> - БЕЗ СТАВКИ<b class="cnt" id="cnt-3"></b><i class="meter" id="meter-3"></i></span>
+    </div>
+  </div>
+
+<script src="js/fight.js"></script>
+<script src="js/roster.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const els = {
+    body:     document.body,
+    banner:   $("banner"),
+    subline:  $("subline"),
+    impact:   $("impact"),
+    timer:    $("timer"),
+    caption:  $("caption"),
+    commands: $("commands"),
+    fighter:  $("fighter"),
+    gorilla:  $("gorilla"),
+    hp: {
+      fighter: [$("hp-fighter"), $("hp-lag-fighter")],
+      gorilla: [$("hp-gorilla"), $("hp-lag-gorilla")],
+    },
+  };
+
+  const TIMING = {
+    contact: 170,   // attacker's dash reaches the defender
+    recover: 430,   // both back to their stance
+    recoverCrit: 650, // a crit holds the knockback a little longer
+    restore: 3000,  // demo mode: back to idle after the result
+  };
+
+  let NAMES = { fighter: "ВЛАД", gorilla: "ГОРИЛЛА" };
+
+  let pending = [];
+
+  function later(fn, ms) {
+    pending.push(setTimeout(fn, ms));
+  }
+
+  function clearPending() {
+    pending.forEach(clearTimeout);
+    pending = [];
+    // A cancelled fight must also stop reactions already playing.
+    stopVoices();
+  }
+
+  // Restart a CSS animation class even if it's already applied
+  function retrigger(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function setHP(who, percent) {
+    els.hp[who].forEach(bar => bar.style.width = percent + "%");
+  }
+
+  function showBanner(text, mode) {
+    els.banner.textContent = text;
+    els.banner.className = "banner";
+    void els.banner.offsetWidth;
+    els.banner.classList.add(...mode.split(" "));   // e.g. "flash long"
+  }
+
+  function hideBanner() {
+    els.banner.className = "banner";
+    els.subline.classList.remove("on");
+  }
+
+  function resetIdle() {
+    attackStop();
+    defeatStop();
+    [els.fighter, els.gorilla].forEach(el =>
+      el.classList.remove("atk", "knock", "crit", "hit", "defeated", "victor"));
+    document.querySelectorAll(".dmg").forEach(el => el.remove());
+    hideBanner();
+  }
+
+  function setNames(names) {
+    if (!names) return;
+    NAMES = names;
+    document.querySelectorAll("[data-name]").forEach(el => el.textContent = NAMES[el.dataset.name]);
+    document.title = `${NAMES.fighter} vs ${NAMES.gorilla} — overlay`;
+  }
+
+  const other = side => side === "fighter" ? "gorilla" : "fighter";
+
+  /* Won-round markers: one pip per round needed to win the fight. */
+  function setPips(score) {
+    for (const side of ["fighter", "gorilla"]) {
+      const box = $("pips-" + side);
+      if (box.childElementCount !== FightScript.ROUNDS_TO_WIN) {
+        box.innerHTML = '<i class="pip"></i>'.repeat(FightScript.ROUNDS_TO_WIN);
+      }
+      const won = score ? score[side] || 0 : 0;
+      [...box.children].forEach((pip, i) => pip.classList.toggle("won", i < won));
+    }
+  }
+
+  /* Final frame of a fight, also used when the overlay connects mid-result. */
+  function showResult(winner, hp) {
+    const loser = other(winner);
+    if (hp) setHP(winner, hp[winner]);
+    setHP(loser, 0);
+    els[loser].classList.remove("atk", "knock", "hit");
+    if (!playDefeat(loser)) els[loser].classList.add("defeated");
+    els[winner].classList.add("victor");
+    els.timer.textContent = "KO";
+    els.timer.classList.remove("urgent");
+    showBanner(NAMES[winner] + " WINS!", "show park");
+  }
+
+  function shake(soft) {
+    els.body.classList.toggle("soft", !!soft);
+    retrigger(els.body, "shake");
+  }
+
+  /* Float the damage number over the defender's head. */
+  function popDamage(def, hit) {
+    const r = def.getBoundingClientRect();
+    const el = document.createElement("div");
+    el.className = "dmg" + (hit.crit ? " crit" : "");
+    el.innerHTML = hit.crit ? `<small>КРИТ!</small>-${hit.dmg}` : `-${hit.dmg}`;
+    // Over the head, not the middle of the box: a roster character's head is in the
+    // roster (Vlad's sits a little right of centre; mirrored in the right corner), the
+    // gorilla's well to the left of its hunched back.
+    const c = CAST[other(hit.by)];
+    const head = !c ? 0.3 : def === els.fighter ? c.head : 1 - c.head;
+    el.style.left = (r.left + r.width * head) + "px";
+    el.style.top = (r.top + r.height * 0.12) + "px";
+    el.addEventListener("animationend", () => el.remove());
+    document.body.append(el);
+  }
+
+  /* ---------- fighters' animations ---------- */
+
+  /* Per fighter: an idle loop and an attack clip (assets/anim, cut from the videos in
+     Downloads), plus `contactMs` — where inside the attack clip the blow lands, so it
+     can start that long before contact. `crit`, if present, replaces the attack on a
+     critical blow; `defeat` plays when they lose the whole fight and stops on its last
+     frame, which stays up through the result screen; `victory` plays once when they
+     win it and ends back in the idle loop.
+     Each corner holds whichever character the streamer picked (public/js/roster.js),
+     built by setCharacter; the right one is the gorilla unless someone stands in its
+     place. The gorilla rears up and swings an arm (full reach at f101
+     of its source); its crit is a two-fisted ground slam (fists hit the ground on f110);
+     its victory is a long roar, head thrown back.
+     Every clip ends blended into idle frame 1, where the loop restarts. */
+  const BEAST = { idle: $("gorilla-idle"), attack: $("gorilla-attack"), contactMs: 540, cls: "striking", ready: false,
+                  crit: { attack: $("gorilla-crit"), contactMs: 708, cls: "slamming" },
+                  victory: $("gorilla-win") };
+  const ANIM = { fighter: null, gorilla: BEAST };
+  // The roster entry in each corner; null in the right one is the gorilla.
+  const CAST = { fighter: null, gorilla: null };
+
+  /* `box` takes .has-anim: the corner itself for the gorilla, its .cast for a character. */
+  function wireAnim(side, box) {
+    const a = ANIM[side];
+    // Swap the still for the idle loop only once video actually plays (OBS and
+    // browsers both handle VP9 alpha; if one doesn't, the still and CSS sway stay).
+    a.idle.addEventListener("playing", () => { a.ready = true; box.classList.add("has-anim"); }, { once: true });
+    a.idle.play().catch(() => {});
+    for (const clip of [a, a.crit].filter(Boolean)) {
+      clip.attack.addEventListener("ended", () => {
+        els[side].classList.remove(clip.cls);
+        a.idle.currentTime = 0;
+      });
+    }
+    if (a.victory) a.victory.addEventListener("ended", () => {
+      els[side].classList.remove("cheering");
+      a.idle.currentTime = 0;
+    });
+  }
+
+  function clipVideo(src, cls, loop) {
+    const v = document.createElement("video");
+    v.className = "sprite anim " + cls;
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.loop = !!loop;
+    v.src = src;
+    return v;
+  }
+
+  /* Put a roster character in a corner: its still, clips and dash lengths. In the
+     right corner an unknown id (or "gorilla") brings the gorilla back. */
+  function setCharacter(side, id) {
+    const c = Roster.CHARACTERS[id] || (side === "fighter" ? Roster.CHARACTERS[Roster.DEFAULT] : null);
+    if (ANIM[side] && c === CAST[side]) return;
+    CAST[side] = c;
+    const el = els[side], box = el.querySelector(".cast");
+    box.querySelectorAll("video").forEach(v => { v.pause(); v.remove(); });
+    box.classList.remove("has-anim");
+    el.classList.remove("punching", "kicking", "losing", "striking", "slamming", "cheering");
+    if (side === "gorilla") {
+      el.classList.toggle("rival", !!c);
+      // The gorilla's clips idle out of sight while someone else stands there.
+      [BEAST.idle, BEAST.attack, BEAST.crit.attack, BEAST.victory].forEach(v => v.pause());
+      if (!c) {
+        ANIM.gorilla = BEAST;
+        BEAST.idle.play().catch(() => {});
+      }
+    }
+    if (c) {
+      box.querySelector(".still").src = c.still;
+      const a = { idle: clipVideo(c.idle, "clip-idle", true), attack: clipVideo(c.attack.src, "clip-attack"),
+                  contactMs: c.attack.contactMs, cls: "punching", ready: false };
+      if (c.crit) a.crit = { attack: clipVideo(c.crit.src, "clip-crit"), contactMs: c.crit.contactMs, cls: "kicking" };
+      if (c.defeat) a.defeat = clipVideo(c.defeat, "clip-defeat");
+      box.append(...[a.idle, a.attack, a.crit && a.crit.attack, a.defeat].filter(Boolean));
+      ANIM[side] = a;
+      wireAnim(side, box);
+    }
+    if (soundReady) preloadVoice(side);
+    setReach();
+  }
+
+  /* The roster's dashes carry a fist to the gorilla's face. A person's face stands
+     somewhere else, so against one each dash is longer or shorter by the gap between
+     the two faces, measured from the defender's own screen edge (both corners sit
+     4vw in, and the mirrored corner keeps the attacker's own geometry). */
+  function faceFromEdge(side) {
+    const c = CAST[side];
+    return c ? els[side].offsetWidth * c.head : gorillaFace();
+  }
+
+  /* The gorilla's face, even while it is hidden: its still at 119.6% of the corner. */
+  function gorillaFace() {
+    const img = els.gorilla.querySelector(":scope > .still");
+    if (!img.naturalHeight) return 0;
+    const h = els.gorilla.offsetHeight * 1.196;
+    return Math.min(h * img.naturalWidth / img.naturalHeight, innerWidth * 0.46) * 0.7;
+  }
+
+  function setReach() {
+    for (const side of ["fighter", "gorilla"]) {
+      const c = CAST[side];
+      if (!c) continue;
+      const gap = Math.round(gorillaFace() - faceFromEdge(other(side)));
+      els[side].style.setProperty("--reach-punch", `calc(${c.attack.reach} + ${gap}px)`);
+      els[side].style.setProperty("--reach-kick", `calc(${(c.crit || c.attack).reach} + ${gap}px)`);
+    }
+  }
+
+  document.querySelectorAll(".cast .still, #gorilla > .still").forEach(img => img.addEventListener("load", setReach));
+  addEventListener("resize", setReach);
+
+  // ?char=<id> picks the left character in the demo, ?vs=<id> the right one; with a
+  // host, the host decides.
+  wireAnim("gorilla", els.gorilla);
+  setCharacter("fighter", new URLSearchParams(location.search).get("char") || Roster.DEFAULT);
+  setCharacter("gorilla", new URLSearchParams(location.search).get("vs") || "gorilla");
+
+  /* The clip a blow uses: the crit one on a critical blow, if the fighter has it. */
+  const clipFor = h => (h.crit && ANIM[h.by].crit) || ANIM[h.by];
+
+  function attackStart(h) {
+    if (!ANIM[h.by].ready) return;
+    const clip = clipFor(h);
+    clip.attack.currentTime = 0;
+    // Show the clip only once its first frame is up, or the last frame of the
+    // previous attack would flash for a moment.
+    clip.attack.play().then(() => els[h.by].classList.add(clip.cls)).catch(() => {});
+  }
+
+  /* The loser of the fight plays their defeat clip instead of fading out, if they
+     have one; false means they don't (or video isn't up), so fade as before. */
+  function playDefeat(side) {
+    const a = ANIM[side];
+    if (!a.ready || !a.defeat) return false;
+    if (els[side].classList.contains("losing")) return true;
+    attackStop();
+    els[side].classList.remove("defeated", "knock", "hit", "crit");
+    a.defeat.currentTime = 0;
+    a.defeat.play().then(() => els[side].classList.add("losing")).catch(() => {});
+    return true;
+  }
+
+  function defeatStop() {
+    for (const side of ["fighter", "gorilla"]) {
+      if (ANIM[side].defeat) ANIM[side].defeat.pause();
+      if (ANIM[side].victory) ANIM[side].victory.pause();
+      els[side].classList.remove("losing", "cheering");
+    }
+  }
+
+  /* The winner of the fight celebrates, if they have a victory clip. */
+  function playVictory(side) {
+    const a = ANIM[side];
+    if (!a.ready || !a.victory) return;
+    for (const clip of [a, a.crit].filter(Boolean)) { clip.attack.pause(); els[side].classList.remove(clip.cls); }
+    a.victory.currentTime = 0;
+    a.victory.play().then(() => els[side].classList.add("cheering")).catch(() => {});
+  }
+
+  function attackStop() {
+    for (const side of ["fighter", "gorilla"]) {
+      for (const clip of [ANIM[side], ANIM[side].crit].filter(Boolean)) {
+        clip.attack.pause();
+        els[side].classList.remove(clip.cls);
+      }
+    }
+  }
+
+  /* ---------- sound ---------- */
+
+  /* Vlad's punches, cut from media/source/Sound. <audio> rather than Web Audio, so the
+     demo also plays when the page is opened straight from disk (no fetch on file://).
+     ?volume=0..1 scales everything, ?mute=1 silences the overlay. */
+  const params = new URLSearchParams(location.search);
+  const VOLUME = params.has("mute") ? 0 : Math.max(0, Math.min(1, parseFloat(params.get("volume") ?? "1") || 0));
+  const clip = src => { const a = new Audio(src); a.preload = "auto"; return a; };
+  /* Per attacker: the clips, and `peakMs` — how far into each clip its loudest
+     moment is. Vlad's punches hit at once; the gorilla's whooshes swell for ~170 ms
+     (cut from media/source/Sound/Massive_heavy_whoosh_#1 / #4), so they start with the
+     dash and peak on contact.
+     The whooshes are almost all sub-200 Hz rumble with no attack, which small
+     speakers barely reproduce and the music masks, so the gorilla also gets a
+     `thud` on contact: Vlad's punches pitched well down — heavier, but audible. */
+  const vladPunches = [1, 2, 3].map(n => clip(`assets/sfx/vlad-punch-${n}.mp3`));
+  const BEAST_SFX = { peakMs: 170, clips: [1, 2].map(n => clip(`assets/sfx/gorilla-swing-${n}.mp3`)), last: -1,
+                      thud: { clips: vladPunches, rate: 0.72, volume: 0.95 } };
+  const SFX = { fighter: { peakMs: 0, clips: vladPunches, last: -1 }, gorilla: BEAST_SFX };
+
+  /* A roster character's own sounds (roster `sfx`), in either corner: punches in place
+     of Vlad's, a shout over the crit, a groan when the other side lands one, a cry when
+     they win the fight. Loaded once per file; a character without them keeps Vlad's
+     punches and stays silent. */
+  // The gorilla's yelp when it takes a blow (Downloads/Massive_gorilla_yelp_#4).
+  const gorillaYelp = clip("assets/sfx/gorilla-yelp.ogg");
+  // ...and its roar on its own attack (Massive_gorilla_yelp_#1, the second, longer cry).
+  const gorillaRoar = clip("assets/sfx/gorilla-roar.ogg");
+  // ...and its victory roar with the win clip (Epic_gorilla_victory_#3: both cries, the
+  // 3 s pause between them cut out).
+  const gorillaWin = clip("assets/sfx/gorilla-win.ogg");
+
+  const clips = {};
+  const clipOf = src => clips[src] || (clips[src] = clip(src));
+  const VOICE = {};
+  const activeVoices = new Set();
+  let voiceGeneration = 0;
+  function stopVoices() {
+    voiceGeneration++;
+    for (const a of activeVoices) { a.pause(); a.currentTime = 0; }
+    activeVoices.clear();
+  }
+  function preloadVoice(side) {
+    const c = CAST[side];
+    const s = (c && c.sfx) || {};
+    if (!c) SFX[side] = BEAST_SFX;
+    else SFX[side] = s.punch ? { peakMs: s.peakMs || 0, clips: s.punch.map(clipOf), last: -1 }
+                             : { peakMs: 0, clips: vladPunches, last: -1 };
+    VOICE[side] = {
+      hurt: { clips: (s.hurt || []).map(clipOf), last: -1 },
+      win: { clips: (s.win || []).map(clipOf), last: -1 },
+      lose: { clips: (s.lose || []).map(clipOf), last: -1 },
+      crit: s.crit ? clipOf(s.crit) : null,
+    };
+  }
+  // setCharacter runs before this section on load; from here on it preloads itself.
+  var soundReady = true;
+  preloadVoice("fighter");
+  preloadVoice("gorilla");
+
+  /* A random clip of `set`, never the same one twice in a row. */
+  function pick(set) {
+    let i = Math.floor(Math.random() * set.clips.length);
+    if (i === set.last) i = (i + 1) % set.clips.length;
+    set.last = i;
+    return set.clips[i].cloneNode();
+  }
+
+  function playVoice(a, volume, ms, onDone) {
+    if (!a || !VOLUME) return;
+    const generation = voiceGeneration;
+    a.volume = VOLUME * volume;
+    later(() => {
+      if (generation !== voiceGeneration) return;
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        a.pause();
+        activeVoices.delete(a);
+        a.removeEventListener("ended", finish);
+        a.removeEventListener("error", finish);
+        if (generation === voiceGeneration && onDone) onDone();
+      };
+      activeVoices.add(a);
+      a.addEventListener("ended", finish, { once: true });
+      a.addEventListener("error", finish, { once: true });
+      a.play().catch(finish);
+      // A stalled/missing file must not block the winner forever. Stop it before
+      // advancing, so even the fallback cannot overlap the two reactions.
+      if (onDone) later(finish, 15000);
+    }, ms);
+  }
+
+  function playResultVoices(winner) {
+    stopVoices(); // Stop any remaining hurt/crit reaction from the final blow.
+    const generation = voiceGeneration;
+    const loser = other(winner);
+    const celebrate = () => {
+      if (generation !== voiceGeneration) return;
+      playVictory(winner);
+      if (!CAST[winner]) playVoice(gorillaWin.cloneNode(), 0.85, 0);
+      else if (VOICE[winner].win.clips.length) playVoice(pick(VOICE[winner].win), 0.9, 0);
+    };
+    if (VOLUME && VOICE[loser].lose.clips.length) {
+      playVoice(pick(VOICE[loser].lose), 0.9, 100, () => later(celebrate, 250));
+    } else if (VOLUME) later(celebrate, 450);
+    else celebrate();
+  }
+
+  // Keep damage reactions behind the attack: 0.7 is about -3.1 dB.
+  const HURT_LEVEL = 0.7;
+
+  /* Called as the attacker starts the dash; lines the clip's peak up with contact. */
+  function schedulePunch(hit) {
+    const set = SFX[hit.by];
+    if (!set || !VOLUME) return;
+    // A character groans just after the other side's blow lands.
+    const def = other(hit.by);
+    if (CAST[def] && VOICE[def].hurt.clips.length) playVoice(pick(VOICE[def].hurt), HURT_LEVEL * (hit.crit || hit.ko ? 0.95 : 0.8), TIMING.contact + 60);
+    // The gorilla yelps when it is hit, whoever hits it: one clip, so the pitch
+    // drifts a little; a crit or the KO lands it lower and louder.
+    if (!CAST[def]) {
+      const y = gorillaYelp.cloneNode();
+      y.preservesPitch = false;
+      y.playbackRate = hit.crit || hit.ko ? 0.88 : 0.95 + Math.random() * 0.12;
+      playVoice(y, HURT_LEVEL * (hit.crit || hit.ko ? 0.9 : 0.7), TIMING.contact + 50);
+    }
+    // Never the same clip twice in a row, and a slight random pitch, so a run of
+    // punches doesn't sound like one sample on repeat.
+    const a = pick(set);
+    // A crit or the KO lands heavier: full volume, pitched down.
+    const heavy = hit.crit || hit.ko;
+    a.preservesPitch = false;
+    a.playbackRate = heavy ? 0.82 : 0.94 + Math.random() * 0.12;
+    a.volume = VOLUME * (heavy ? 1 : 0.85);
+    // A slower clip reaches its peak later, so start it that much earlier.
+    later(() => {
+      // A browser tab blocks sound until the page is clicked; OBS plays it right away.
+      a.play().catch(() => {});
+    }, Math.max(0, TIMING.contact - set.peakMs / a.playbackRate));
+    if (set.thud) {
+      const t = set.thud.clips[Math.floor(Math.random() * set.thud.clips.length)].cloneNode();
+      t.preservesPitch = false;
+      t.playbackRate = set.thud.rate * (heavy ? 0.9 : 0.97 + Math.random() * 0.06);
+      t.volume = VOLUME * set.thud.volume;
+      later(() => t.play().catch(() => {}), TIMING.contact);
+    }
+    later(() => duckMusic(hit.ko), TIMING.contact);
+  }
+
+  /* Fight music: from "FIGHT!" to just after the KO. The track is mastered loud
+     (-13 LUFS), so it sits well under the punches, and dips further on each one. */
+  const MUSIC_LEVEL = 0.06;
+  const DUCK_LEVEL = 0.35;   // share of MUSIC_LEVEL the music drops to on a punch
+  const DUCK_MS = 350;       // how long the dip lasts before the music swells back
+  // Both tracks are levelled to the same loudness, so swapping keeps the mix:
+  // fight-music-1 / fight-music-4 come from media/source/Sound/Dark_epic_fighting_g_#1 / #4.
+  const MUSIC_SRC = "assets/sfx/fight-music-1.mp3";
+  const music = new Audio(MUSIC_SRC);
+  music.preload = "auto";
+  music.loop = true;
+  let musicFade = null, duckTimer = null, musicStopping = false;
+
+  /* The opening gong rings out on "FIGHT!"; the music comes in under its tail. */
+  const GONG_LEVEL = 0.55;
+  const MUSIC_DELAY_MS = 600;
+  const gong = new Audio("assets/sfx/gong.mp3");
+  gong.preload = "auto";
+
+  function playGong() {
+    if (!VOLUME) return;
+    const a = gong.cloneNode();
+    a.volume = VOLUME * GONG_LEVEL;
+    a.play().catch(() => {});
+  }
+
+  /* Ramp the music volume to `to` over `ms`; a timer, not rAF, because OBS
+     throttles animation frames on a source that is not on screen. */
+  function fadeMusic(to, ms, then) {
+    clearInterval(musicFade);
+    const from = music.volume, t0 = Date.now();
+    musicFade = setInterval(() => {
+      const k = Math.min(1, (Date.now() - t0) / ms);
+      music.volume = from + (to - from) * k;
+      if (k < 1) return;
+      clearInterval(musicFade);
+      musicFade = null;
+      if (then) then();
+    }, 30);
+  }
+
+  /* @param {number} offsetMs how far into the fight we are (an overlay that joins mid-fight) */
+  function startMusic(offsetMs) {
+    if (!VOLUME) return;
+    clearInterval(musicFade);
+    clearTimeout(duckTimer);
+    musicStopping = false;
+    music.volume = 0;
+    music.currentTime = (offsetMs / 1000) % (music.duration || 30);
+    music.play().catch(() => {});
+    fadeMusic(VOLUME * MUSIC_LEVEL, 150);
+  }
+
+  /* Sidechain-style dip: drop the music under a punch, then bring it back —
+     except after the KO, where it stays down until stopMusic fades it out. */
+  function duckMusic(stayDown) {
+    if (music.paused || !VOLUME || musicStopping) return;
+    clearInterval(musicFade);
+    music.volume = VOLUME * MUSIC_LEVEL * DUCK_LEVEL;
+    clearTimeout(duckTimer);
+    if (stayDown) return;
+    duckTimer = setTimeout(() => { if (!musicStopping) fadeMusic(VOLUME * MUSIC_LEVEL, 250); }, DUCK_MS);
+  }
+
+  function stopMusic(ms) {
+    if (music.paused) return;
+    musicStopping = true;
+    clearTimeout(duckTimer);
+    fadeMusic(0, ms, () => music.pause());
+  }
+
+  /* One exchange: the attacker dashes in, the defender flashes and is knocked back.
+     A crit lands harder: bigger number, red flash, full shake, longer knockback. */
+  function blow(hit, finalRound) {
+    const atk = els[hit.by], def = els[other(hit.by)];
+    atk.classList.remove("knock");
+    def.classList.remove("crit");
+    atk.classList.add("atk");
+    schedulePunch(hit);
+    later(() => {
+      def.classList.add("hit", "knock");
+      def.classList.toggle("crit", !!hit.crit);
+      setHP("fighter", hit.hp.fighter);
+      setHP("gorilla", hit.hp.gorilla);
+      popDamage(def, hit);
+      shake(hit.dmg < 18 && !hit.ko && !hit.crit);
+      els.impact.classList.toggle("crit", !!hit.crit);
+      if (hit.dmg >= 18 || hit.ko || hit.crit) retrigger(els.impact, "on");
+      if (hit.ko) {
+        els.timer.textContent = "KO";
+        const side = other(hit.by);
+        if (!(finalRound && ANIM[side].defeat && ANIM[side].ready)) def.classList.add("defeated");
+        else later(() => playDefeat(side), 150);
+      }
+    }, TIMING.contact);
+    later(() => {
+      atk.classList.remove("atk");
+      def.classList.remove("hit");
+      if (!hit.ko) def.classList.remove("knock", "crit");
+    }, hit.crit ? TIMING.recoverCrit : TIMING.recover);
+  }
+
+  /* Fresh bars and stances for round `r`; `quiet` skips the "ROUND N" banner
+     (an overlay that joins after it was shown). */
+  function startRound(r, quiet) {
+    resetIdle();
+    setHP("fighter", 100);
+    setHP("gorilla", 100);
+    els.timer.textContent = String(Math.ceil((r.ko - r.fight) / 1000));
+    if (!quiet) showBanner(`ROUND ${r.n}`, "flash long");
+  }
+
+  /* After a round's KO: light the winner's pip; the last round ends the fight. */
+  function endRound(r, last, finalHp) {
+    setPips(r.score);
+    if (last) {
+      showResult(r.winner, finalHp);
+      shake(false);
+      stopMusic(1800);
+      playResultVoices(r.winner);
+      return;
+    }
+    els[r.winner].classList.add("victor");
+    showBanner("K.O.", "show");
+  }
+
+  /**
+   * Play a fight script (see js/fight.js): every round, from "ROUND 1" to the
+   * winner banner. `script.elapsed` > 0 means the overlay joined mid-fight.
+   * @param {{rounds: object[], hits: object[], reveal: number, elapsed?: number}} script
+   * @param {boolean} [autoRestore] demo mode: return to idle on our own.
+   */
+  function playFight(script, autoRestore) {
+    clearPending();
+    // The host stamps `elapsed` when it sends the fight, so even a live overlay sees
+    // a few ms; only a real late join should skip "ROUND 1" and the gong.
+    const elapsed = (script.elapsed || 0) < JOIN_LATE_MS ? 0 : script.elapsed;
+    const { rounds, hits } = script;
+    const lastRound = rounds[rounds.length - 1];
+    const finalHp = hits[hits.length - 1].hp;
+
+    // Rebuild where the fight stands right now: the round in progress, the pips
+    // for rounds already decided, the bars as of the last blow landed.
+    const cur = [...rounds].reverse().find(r => r.start <= elapsed) || rounds[0];
+    startRound(cur, elapsed > 0);
+    const prev = rounds[cur.n - 2];
+    setPips(prev ? prev.score : null);
+    const landed = hits.filter(h => h.round === cur.n - 1 && h.at < elapsed);
+    if (landed.length) {
+      const h = landed[landed.length - 1];
+      setHP("fighter", h.hp.fighter);
+      setHP("gorilla", h.hp.gorilla);
+      if (h.ko) { els[other(h.by)].classList.add("defeated"); els.timer.textContent = "KO"; }
+    }
+
+    // Everything still to come, on one timeline.
+    const events = [];
+    const at = (t, fn) => { if (t >= elapsed) events.push([t, fn]); };
+    rounds.forEach((r, i) => {
+      if (i > 0) at(r.start, () => startRound(r, false));
+      at(r.fight, () => { showBanner("FIGHT!", "flash"); playGong(); });
+      // Countdown to this round's KO in the timer box.
+      for (let t = r.fight + 1000; t < r.ko; t += 1000) {
+        const left = Math.ceil((r.ko - t) / 1000);
+        at(t, () => { if (els.timer.textContent !== "KO") els.timer.textContent = String(left); });
+      }
+      at(r.end, () => endRound(r, r === lastRound, finalHp));
+    });
+    for (const h of hits) {
+      at(h.at, () => blow(h, h.round === rounds.length - 1));
+      // Each blow is the attacker's attack clip: start it early so it lands on contact.
+      // A character's crit shout starts with the clip, its loudest on the blow.
+      at(h.at + TIMING.contact - clipFor(h).contactMs, () => {
+        attackStart(h);
+        if (h.crit && VOICE[h.by].crit) playVoice(VOICE[h.by].crit.cloneNode(), 0.95, 0);
+        // The gorilla roars as it swings: the roar peaks ~180 ms in, 200 ms before the blow.
+        if (!CAST[h.by]) {
+          const r = gorillaRoar.cloneNode();
+          r.preservesPitch = false;
+          r.playbackRate = h.crit || h.ko ? 0.9 : 0.95 + Math.random() * 0.1;
+          playVoice(r, h.crit || h.ko ? 0.75 : 0.6, Math.max(0, clipFor(h).contactMs - 380));
+        }
+      });
+    }
+    for (const [t, fn] of events) later(fn, t - elapsed);
+
+    // Music runs under the whole fight, coming in after the first gong; an
+    // overlay that joins late picks it up in place.
+    const musicAt = rounds[0].fight + MUSIC_DELAY_MS;
+    if (elapsed < musicAt) later(() => startMusic(0), musicAt - elapsed);
+    else startMusic(elapsed - musicAt);
+
+    if (autoRestore) later(resetIdle, script.reveal - elapsed + TIMING.restore);
+  }
+
+  const JOIN_LATE_MS = 400;
+
+  let demoTimer = null;
+  function demoFight(winner) {
+    winner = winner || (Math.random() < 0.5 ? "fighter" : "gorilla");
+    const script = FightScript.make(winner, n => Math.floor(Math.random() * n));
+    playFight(script, true);
+    // The next fight once this one's result has had its moment (fights run 23-35 s).
+    clearTimeout(demoTimer);
+    demoTimer = setTimeout(() => demoFight(), script.reveal + TIMING.restore + 1500);
+  }
+
+  function skipFight() {
+    clearPending();
+    resetIdle();
+    stopMusic(300);
+    setPips(null);
+    setHP("fighter", 100);
+    setHP("gorilla", 100);
+    els.timer.textContent = "99";
+    els.timer.classList.remove("urgent");
+  }
+
+  els.body.addEventListener("animationend", e => {
+    if (e.animationName === "shake" || e.animationName === "shake-soft") els.body.classList.remove("shake", "soft");
+  });
+
+  /* ---------- host-driven mode ---------- */
+
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  const votesWord = n => `${n} ${plural(n, "ГОЛОС", "ГОЛОСА", "ГОЛОСОВ")}`;
+
+  function caption(html) {
+    els.caption.innerHTML = html || "";
+    els.caption.classList.toggle("on", !!html);
+  }
+
+  function renderVotes(s, live) {
+    els.commands.classList.toggle("live", live);
+    for (const c of [1, 2, 3]) {
+      const n = s.votes ? s.votes[c] : 0;
+      const p = s.total ? Math.round(n / s.total * 100) : 0;
+      $("cnt-" + c).textContent = ` ${p}%`;
+      $("meter-" + c).style.width = p + "%";
+    }
+  }
+
+  /* "БОЙ 3/20" under the timer while a series runs; the last fight is flagged. */
+  function renderSeries(s) {
+    const el = $("series");
+    const x = s.series;
+    el.hidden = !x;
+    if (!x) return;
+    const last = x.n === x.total && !x.over;
+    el.classList.toggle("last", last || x.over);
+    el.innerHTML = x.over && s.phase !== "result"
+      ? `СЕРИЯ ОКОНЧЕНА`
+      : `${last ? "ПОСЛЕДНИЙ БОЙ" : "БОЙ"} <b>${x.n}/${x.total}</b>`;
+  }
+
+  let seen = { round: -1, phase: null };
+
+  function onState(s) {
+    if (s.character) setCharacter("fighter", s.character);
+    if (s.opponent) setCharacter("gorilla", s.opponent);
+    setNames(s.names);
+    renderSeries(s);
+    const fresh = s.round !== seen.round || s.phase !== seen.phase;
+    const prevPhase = seen.round === s.round ? seen.phase : null;
+    seen = { round: s.round, phase: s.phase };
+
+    switch (s.phase) {
+      case "voting":
+        if (fresh) skipFight();
+        renderVotes(s, true);
+        els.timer.textContent = s.waiting ? "--" : String(s.left);
+        els.timer.classList.toggle("urgent", !s.waiting && s.left <= 5);
+        caption(s.waiting
+          ? `ЖДЁМ ГОЛОСОВ · <b>${s.total}/${s.minVotes}</b>`
+          : `КТО ПОБЕДИТ? ДЕЛАЙТЕ СТАВКИ В ЧАТЕ · <b>${votesWord(s.total)}</b>`);
+        break;
+
+      case "fight":
+        renderVotes(s, true);
+        caption("");
+        if (fresh && s.fight) playFight(s.fight, false);
+        break;
+
+      case "result":
+        renderVotes(s, true);
+        caption("");
+        // Connected after the fight animation: jump straight to its last frame.
+        if (fresh && prevPhase !== "fight") { skipFight(); showResult(s.winner, s.hp); }
+        if (fresh) {
+          setPips(s.score);
+          const sc = s.score ? `<b>${s.score[s.winner]}:${s.score[other(s.winner)]}</b> · ` : "";
+          const bets = s.bets ?? s.total;
+          els.subline.innerHTML = sc + (bets
+            ? `УГАДАЛИ <b>${s.right}</b> ИЗ <b>${bets}</b> · <b>${Math.round(s.right / bets * 100)}%</b>`
+            : "СТАВОК НЕ БЫЛО");
+          els.subline.classList.add("on");
+        }
+        break;
+
+      case "skipped":
+        renderVotes(s, true);
+        caption("");
+        if (fresh) { skipFight(); showBanner("SKIP", "show"); els.timer.textContent = "--"; }
+        break;
+
+      case "pause":
+        if (fresh) skipFight();
+        renderVotes(s, false);
+        caption(`СЛЕДУЮЩИЙ БОЙ ЧЕРЕЗ <b>${s.left}</b>`);
+        break;
+
+      default: // idle
+        if (fresh) skipFight();
+        renderVotes(s, false);
+        caption(s.series && s.series.over ? `СЕРИЯ ИЗ <b>${s.series.total}</b> БОЁВ ОКОНЧЕНА` : "");
+    }
+  }
+
+  function connectHost() {
+    let retry = 0;
+    const open = () => {
+      const es = new EventSource("/events?role=overlay");
+      es.onopen = () => { retry = 0; };
+      es.onmessage = ev => {
+        let m; try { m = JSON.parse(ev.data); } catch { return; }
+        if ((m.t === "hello" || m.t === "state") && m.session) onState(m.session);
+      };
+      es.onerror = () => {
+        es.close();
+        retry = Math.min(retry + 1, 6);
+        setTimeout(open, 250 * 2 ** retry);
+      };
+    };
+    open();
+  }
+
+  /* ---------- demo mode (opened as a file, or ?solo=1) ---------- */
+
+  const solo = location.protocol === "file:" || new URLSearchParams(location.search).has("solo");
+
+  if (solo) {
+    // Keyboard shortcuts for testing: 1 = fighter wins, 2 = gorilla wins, 3 = skip, space = random
+    document.addEventListener("keydown", e => {
+      if (e.key === "1") demoFight("fighter");
+      else if (e.key === "2") demoFight("gorilla");
+      else if (e.key === "3") { clearTimeout(demoTimer); skipFight(); }
+      else if (e.key === " ") demoFight();
+    });
+    // Each fight schedules the next one when it is over.
+    setTimeout(() => demoFight(), 800);
+  } else {
+    connectHost();
+  }
+</script>
+</body>
+</html>

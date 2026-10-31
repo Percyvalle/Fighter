@@ -1,0 +1,21 @@
+server {
+    listen 443 ssl http2;
+    server_name fight.example.com;
+
+    # Configure TLS certificates with your certificate manager.
+    ssl_certificate     /etc/letsencrypt/live/fight.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fight.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:7778;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Required for Server-Sent Events.
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+}

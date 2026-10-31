@@ -1,0 +1,20 @@
+[Unit]
+Description=Fight overlay host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fight
+ExecStart=/usr/bin/node /opt/fight/server/index.mjs
+EnvironmentFile=/opt/fight/.env
+Environment=NODE_ENV=production
+Environment=POINTS_FILE=/opt/fight/data/points.json
+Environment=TOKENS_FILE=/opt/fight/data/.tokens.json
+Environment=AGENT_FILE=/opt/fight/data/.agent.json
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

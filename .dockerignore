@@ -1,0 +1,14 @@
+node_modules
+.git
+.codex
+.agents
+.env
+config.json
+.tokens.json
+.agent.json
+points.json
+points.json.bak
+points.json.tmp
+data
+media
+docs

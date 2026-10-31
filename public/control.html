@@ -1,0 +1,786 @@
+<title>Файтинг — панель</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #07050a; --panel: #130d14; --panel2: #1d141e; --well: #0d090e; --line: #2a1d2a; --line2: #45304a;
+    --ink: #fff1ea; --muted: #b39ea8; --dim: #6f5a68;
+    --fire: #ff8a00; --fire2: #ffd23f; --fire-ink: #1a0b02; --red: #d10a0a;
+    --ok: #7ff0c4; --warn: #ffd36b; --bad: #ff5a48; --blue: #8fa8dc;
+    --f-ui: Rubik, "Segoe UI", Arial, sans-serif;
+    --f-mono: "JetBrains Mono", Consolas, monospace;
+    --f-head: "Russo One", Rubik, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink); font: 15px/1.5 var(--f-ui); padding: 28px 20px 48px;
+    background:
+      radial-gradient(900px 380px at 85% -120px, rgba(209,10,10,.16), transparent 70%),
+      radial-gradient(700px 300px at 0% -80px, rgba(255,138,0,.08), transparent 70%),
+      var(--bg);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px; }
+
+  /* header */
+  .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 24px; padding-bottom: 10px; }
+  .brand { display: grid; gap: 4px; flex: 1 1 auto; min-width: 0; }
+  .eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+  h1 { font-family: var(--f-head); font-size: clamp(22px, 4vw, 28px); line-height: 1.2; font-weight: 400; margin: 0; letter-spacing: .3px; }
+  h1 span { color: var(--fire); text-shadow: 0 0 24px rgba(255,138,0,.45); }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(19,13,20,.8); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .pill b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; }
+  .pill.up { border-color: rgba(127,240,196,.3); color: var(--ink); }
+  .pill.up .dot { background: var(--ok); box-shadow: 0 0 8px rgba(127,240,196,.7); }
+  .pill.down .dot { background: var(--warn); animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  /* layout */
+  .grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; }
+  .grid > .card { display: flex; flex-direction: column; }
+  .card .note:last-child, .card .linkrow:last-child { margin-top: auto; }
+  @media (max-width: 880px) { .grid { grid-template-columns: minmax(0,1fr); } }
+
+  .card { background: linear-gradient(180deg, #170f18, var(--panel)); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px 22px; display: grid; gap: 17px; align-content: start; box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 18px 40px -24px rgba(0,0,0,.8); }
+  .card.hero { border-color: #3a2638; }
+  .card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .card h2 { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 600; }
+  .card h2::before { content: ""; width: 6px; height: 6px; transform: rotate(45deg); background: var(--fire); box-shadow: 0 0 8px rgba(255,138,0,.6); }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .row.tight { gap: 8px; }
+  .sub { color: var(--muted); font-size: 13px; text-wrap: pretty; }
+  .sub b { color: var(--ink); font-weight: 500; }
+  label { color: var(--muted); font-size: 13px; }
+
+  button, select, input { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; transition: border-color .15s, background .15s, filter .15s, transform .05s; }
+  button { cursor: pointer; font-weight: 500; }
+  button:hover:not(:disabled) { border-color: var(--line2); background: #2a1c2b; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: linear-gradient(180deg, var(--fire2), var(--fire) 60%); color: var(--fire-ink); border-color: var(--fire); font-weight: 600; box-shadow: 0 6px 20px -8px rgba(255,138,0,.7); }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(180deg, var(--fire2), var(--fire) 60%); border-color: var(--fire); }
+  button.ghost { background: transparent; }
+  button.ghost:hover:not(:disabled) { border-color: rgba(255,90,72,.5); color: #ffb3a8; background: rgba(255,90,72,.06); }
+  button.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 8px; }
+  button.chip { font-family: var(--f-mono); font-size: 13px; padding: 7px 13px; border-radius: 999px; background: var(--well); color: var(--muted); }
+  button.chip:hover { color: var(--ink); }
+  button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--fire); outline-offset: 2px; }
+  input:focus, select:focus { border-color: var(--line2); outline: none; }
+  select { cursor: pointer; padding-right: 10px; }
+  input { min-width: 0; background: var(--well); }
+  input::placeholder { color: var(--dim); }
+  input.grow { flex: 1; }
+  a { color: var(--fire); text-decoration: none; }
+  a:hover { color: var(--fire2); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* round */
+  .stat { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 520px) { .stat { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat div { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; display: grid; gap: 2px; }
+  .stat div:first-child { border-color: rgba(255,138,0,.35); background: linear-gradient(180deg, rgba(255,138,0,.10), var(--well)); }
+  .stat div:first-child b { color: var(--fire2); font-family: var(--f-head); font-weight: 400; font-size: 20px; }
+  .stat b { display: block; font-family: var(--f-mono); font-size: 24px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat small { color: var(--dim); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; order: -1; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  /* fixed height, so the select pill and the checkbox pill line up */
+  .setting { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 4px 0 12px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
+  .setting select { height: 34px; padding: 0 10px; border-radius: 9px; font-family: var(--f-mono); }
+  .setting input[type=number] { width: 8ch; height: 34px; padding: 0 8px; border-radius: 9px; font-family: var(--f-mono); }
+  .setting button.sm { height: 34px; }
+  .setting.toggle { padding: 0 14px 0 12px; cursor: pointer; }
+  .setting.toggle input { accent-color: var(--fire); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+
+  .opts { display: grid; gap: 10px; }
+  .opt { display: grid; gap: 7px; padding: 10px 12px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
+  .opt.win { border-color: rgba(255,210,63,.55); background: linear-gradient(90deg, rgba(255,210,63,.10), var(--well)); }
+  .opt-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .opt-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; min-width: 0; }
+  .opt-n { font-family: var(--f-mono); font-size: 11px; color: var(--fire2); height: 20px; padding: 0 6px; display: grid; place-items: center; border: 1px solid rgba(255,138,0,.35); border-radius: 6px; flex: none; }
+  .opt b { font-family: var(--f-mono); font-weight: 500; font-size: 13px; white-space: nowrap; }
+  .opt b i { font-style: normal; color: var(--dim); margin-left: 6px; }
+  .bar { height: 4px; border-radius: 4px; background: #241823; overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--red), var(--fire), var(--fire2)); transition: width .4s; }
+
+  .result { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,210,63,.35); background: linear-gradient(180deg, rgba(255,210,63,.08), var(--well)); display: grid; gap: 4px; }
+  .result .big { font-family: var(--f-head); font-size: 19px; color: var(--fire2); }
+  .result .sub { word-break: break-word; }
+  .empty { padding: 16px; text-align: center; color: var(--dim); font-size: 13px; border: 1px dashed var(--line); border-radius: 12px; }
+
+  /* platforms */
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; display: inline-block; }
+  .dot.connected { background: var(--ok); box-shadow: 0 0 8px rgba(127,240,196,.7); }
+  .dot.connecting, .dot.reconnecting { background: var(--warn); box-shadow: 0 0 8px rgba(255,211,107,.5); animation: blink 1.2s infinite; }
+  .dot.error { background: var(--bad); box-shadow: 0 0 8px rgba(255,90,72,.6); }
+  #platforms { display: grid; gap: 12px; flex: 1; grid-auto-rows: 1fr; }
+  .plat { display: grid; gap: 8px; padding: 12px 14px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
+  .plat .name { font-weight: 600; font-size: 17px; white-space: nowrap; }
+  .plat-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .plat-l { display: flex; align-items: center; gap: 9px; flex: none; }
+  .plat-r { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; }
+  .plat-r button.sm { padding: 7px 13px; font-size: 13.5px; }
+  .plat-r input.claim { padding: 6px 10px; font-size: 13px; border-radius: 8px; width: 11ch; }
+  .plat-r .tag { font-size: 12px; padding: 6px 11px; border-radius: 8px; }
+  .plat .detail { display: grid; align-content: center; gap: 3px; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,.02); border: 1px solid var(--line); font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); word-break: break-word; }
+  .plat .st { font-family: var(--f-mono); font-size: 14px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .plat .st.connected { color: var(--ok); }
+  .plat .st.connecting, .plat .st.reconnecting { color: var(--warn); }
+  .plat .st.error { color: var(--bad); }
+  .tag { font-family: var(--f-mono); font-size: 10.5px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .tag.on { color: var(--ok); border-color: rgba(127,240,196,.35); background: rgba(127,240,196,.06); }
+  a.tag { color: var(--fire); border-color: rgba(255,138,0,.4); background: rgba(255,138,0,.06); }
+  a.tag:hover { text-decoration: none; background: rgba(255,138,0,.14); }
+  .note { font-size: 12.5px; color: var(--muted); padding: 10px 12px; border-radius: 10px; background: rgba(143,168,220,.06); border: 1px solid rgba(143,168,220,.18); text-wrap: pretty; }
+  .note b { color: var(--ink); font-weight: 500; }
+
+  /* test */
+  .field { display: flex; gap: 8px; align-items: stretch; }
+  .field select { flex: none; font-family: var(--f-mono); font-size: 13px; }
+  .send { display: flex; gap: 8px; }
+  .send input { font-family: var(--f-mono); font-size: 13px; }
+  .flood { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; background: var(--well); border: 1px solid var(--line); border-radius: 12px; }
+  .flood input { width: 76px; padding: 5px 8px; font-family: var(--f-mono); font-size: 13px; background: var(--panel2); }
+
+  /* links */
+  .links { display: grid; gap: 15px; font-size: 13px; color: var(--muted); }
+  .links .k { display: block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: 5px; }
+  .codes { display: flex; flex-wrap: wrap; gap: 5px; }
+  code { font-family: var(--f-mono); font-size: 13px; color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; }
+  #overlay-url, #points-url { display: block; padding: 8px 10px; word-break: break-all; color: var(--fire2); }
+  .linkrow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .linkrow a { padding: 7px 12px; border-radius: 10px; border: 1px solid rgba(255,138,0,.35); background: rgba(255,138,0,.06); font-size: 13px; font-weight: 500; }
+  .linkrow a:hover { text-decoration: none; background: rgba(255,138,0,.14); }
+  .linkrow a.alt { border-color: var(--line); background: var(--well); color: var(--ink); }
+  .linkrow a.alt:hover { border-color: var(--line2); }
+
+  /* voters & history */
+  .count { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding: 2px 9px; border-radius: 999px; background: var(--well); border: 1px solid var(--line); }
+  .count b { color: var(--ink); font-weight: 500; }
+  #voters { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+  .ppl { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--well); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+  .ppl .pl { font-family: var(--f-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; flex: none; width: 34px; }
+  .ppl .pl.twitch { color: #b388ff; }
+  .ppl .pl.kick { color: #53fc18; }
+  .ppl .pl.local { color: var(--dim); }
+  .ppl .nick { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ppl .ch { font-family: var(--f-mono); font-size: 10.5px; color: var(--fire2); flex: none; padding: 1px 6px; border: 1px solid rgba(255,138,0,.3); border-radius: 5px; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ppl .ch.c3 { color: var(--dim); border-color: var(--line); }
+  #voters .empty { grid-column: 1 / -1; }
+
+  .score { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .score div { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+  .score b { font-family: var(--f-mono); font-size: 22px; font-weight: 500; }
+  .score small { color: var(--dim); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; order: -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #history { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+  /* winner on the first line, the numbers under it: the bet details no longer fit beside it */
+  .h { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 7px 10px; background: var(--well); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+  .h .n { font-family: var(--f-mono); font-size: 11px; color: var(--dim); }
+  .h .w { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h .w.skip { color: var(--dim); }
+  .h .v { grid-column: 2; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* leaderboard */
+  #top { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+  .lb { display: grid; grid-template-columns: 30px 34px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 10px; background: var(--well); border: 1px solid var(--line); border-radius: 10px; font-size: 13.5px; }
+  .lb:nth-child(1) { border-color: rgba(255,210,63,.55); background: linear-gradient(90deg, rgba(255,210,63,.12), var(--well)); }
+  .lb:nth-child(2), .lb:nth-child(3) { border-color: rgba(255,138,0,.35); }
+  .lb .n { font-family: var(--f-mono); font-size: 12px; color: var(--fire2); text-align: right; }
+  .lb .pl { font-family: var(--f-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+  .lb .pl.twitch { color: #b388ff; } .lb .pl.kick { color: #53fc18; } .lb .pl.local { color: var(--dim); }
+  .lb .nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb .pts { font-family: var(--f-mono); font-weight: 500; color: var(--ink); }
+  .lb .wl { font-family: var(--f-mono); font-size: 11px; color: var(--dim); white-space: nowrap; }
+  .lb.zero .pts { color: var(--dim); }
+  button.danger { border-color: rgba(255,90,72,.6); color: #ffb3a8; background: rgba(255,90,72,.12); }
+  .lb { cursor: pointer; }
+  .lb:hover { border-color: var(--line2); }
+  .give { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 720px) { .give { grid-template-columns: minmax(0, 1fr); } }
+  .give .flood { flex-wrap: nowrap; }
+  .give input { min-width: 0; padding: 6px 9px; font-family: var(--f-mono); font-size: 13px; background: var(--panel2); }
+  .give input.nick { flex: 1; }
+  .give input.amt { width: 9ch; flex: none; }
+  .give input.pct { width: 7ch; flex: none; }
+  .give input.base { width: 11ch; flex: none; }
+  .give .wide { grid-column: 1 / -1; flex-wrap: wrap; }
+  .give .each { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); }
+  .give .each b { color: var(--fire2); font-weight: 500; }
+  .give label { flex: none; }
+  #give-msg { font-family: var(--f-mono); font-size: 12px; color: var(--muted); min-height: 1.4em; }
+  #give-msg.bad { color: var(--bad); }
+  #give-msg.ok { color: var(--ok); }
+
+  /* log */
+  #log { font-family: var(--f-mono); font-size: 12px; line-height: 1.7; background: #0a070b; border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+  #log > div { padding: 0 10px; border-left: 2px solid transparent; }
+  #log > div:hover { background: rgba(255,255,255,.025); }
+  #log .t { color: var(--dim); }
+  #log .warn { color: var(--warn); border-left-color: var(--warn); background: rgba(255,211,107,.04); }
+  #log .error { color: var(--bad); border-left-color: var(--bad); background: rgba(255,90,72,.05); }
+  #log .scope { color: var(--blue); }
+  #log .scope::before { content: "["; color: var(--dim); }
+  #log .scope::after { content: "]"; color: var(--dim); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">Панель стримера</div>
+      <h1><span data-name="fighter">ВЛАД</span> vs <span data-name="gorilla">ГОРИЛЛА</span></h1>
+    </div>
+    <div class="pills">
+      <div class="pill down" id="hostpill"><i class="dot"></i>Хост: <span id="hoststate">подключение…</span></div>
+      <div class="pill">Оверлеев: <b id="overlays">0</b></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card hero">
+      <div class="card-h"><h2>Бой</h2></div>
+      <div class="stat">
+        <div><b id="s-phase">—</b><small>фаза</small></div>
+        <div><b id="s-round">0</b><small id="s-round-k">бой №</small></div>
+        <div><b id="s-total">0</b><small>голосов</small></div>
+        <div><b id="s-timer">—</b><small id="s-timer-k">таймер</small></div>
+      </div>
+      <div class="controls">
+        <div class="row">
+          <button id="b-start" class="primary" type="button">Открыть голосование</button>
+          <button id="b-go" type="button" title="Закрыть голосование и начать бой. Без голосования — бой сразу.">Бой сейчас</button>
+          <button id="b-skip" class="ghost" type="button" title="Отменить текущий бой, ничего не записывая">Отменить бой</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="setting" id="char-box" title="Кто стоит слева (!1). Меняется, пока не идут ставки и бой.">
+          <label for="char">Персонаж</label>
+          <select id="char"></select>
+        </div>
+        <div class="setting" id="opp-box" title="Кто стоит справа (!2): горилла или другой персонаж. Меняется, пока не идут ставки и бой.">
+          <label for="opp">Соперник</label>
+          <select id="opp"></select>
+        </div>
+        <div class="setting" id="series-box">
+          <label for="series">Серия боёв</label>
+          <input id="series" type="number" min="0" max="500" step="1" placeholder="выкл">
+          <button id="b-series" class="sm" type="button">Задать</button>
+        </div>
+        <div class="setting">
+          <label for="vote-sec">Голосование</label>
+          <select id="vote-sec"></select>
+        </div>
+        <label class="setting toggle" title="После результата и паузы новое голосование открывается само">
+          <input type="checkbox" id="auto"> Автоповтор боёв
+        </label>
+      </div>
+      <div class="opts" id="opts"></div>
+      <div id="result" hidden></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Платформы</h2></div>
+      <div id="platforms"></div>
+      <div class="note">Чтение работает и без авторизации (Twitch — анонимно). Авторизация нужна, чтобы бот <b>писал</b> в чат: объявлял голосование и победителя.</div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Тестовое сообщение</h2></div>
+      <div class="sub">Прогоняет весь путь «чат → роутер → оверлей» без живого чата.</div>
+      <div class="field">
+        <select id="i-plat"><option value="local">local</option><option value="twitch">twitch</option><option value="kick">kick</option></select>
+        <input id="i-nick" class="grow" placeholder="ник" value="tester" size="8">
+      </div>
+      <div class="send">
+        <input id="i-text" class="grow" placeholder="!1" value="!1">
+        <button id="b-inject" class="primary" type="button">Отправить</button>
+      </div>
+      <div class="row tight">
+        <button class="chip" data-fill="!1" type="button">!1</button>
+        <button class="chip" data-fill="!2" type="button">!2</button>
+        <button class="chip" data-fill="!3" type="button">!3</button>
+        <button class="chip" data-fill="!join" type="button">!join</button>
+      </div>
+      <div class="flood">
+        <label for="i-n">Пачкой</label>
+        <input id="i-n" type="number" value="25" min="1" max="500">
+        <button id="b-flood" class="sm" type="button">случайных голосов</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Ссылки и команды</h2></div>
+      <div class="links">
+        <div><span class="k">OBS Browser Source · 1920×1080</span><code id="overlay-url">—</code></div>
+        <div><span class="k">OBS Browser Source · таблица очков · прозрачный фон, напр. 520×720</span><code id="points-url">—</code></div>
+        <div><span class="k">В чате — ставки и запись в таблицу</span><div class="codes"><code>!1</code><code>!2</code><code>!3</code><code>!join</code></div></div>
+      </div>
+      <div class="linkrow">
+        <a id="open-overlay" href="/overlay.html" target="_blank">Открыть оверлей ↗</a>
+        <a class="alt" href="/points.html" target="_blank">Таблица очков ↗</a>
+        <a class="alt" href="/overlay.html?solo=1" target="_blank">Демо без хоста ↗</a>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-h">
+        <h2>Голоса</h2>
+        <span class="count">в этом бою: <b id="v-count">0</b></span>
+      </div>
+      <div id="voters"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h">
+        <h2>Счёт</h2>
+        <button id="b-reset" class="sm ghost" type="button" title="Обнулить счёт и историю боёв">Сбросить счёт</button>
+      </div>
+      <div class="score">
+        <div><b id="w-fighter">0</b><small data-name="fighter">ВЛАД</small></div>
+        <div><b id="w-gorilla">0</b><small data-name="gorilla">ГОРИЛЛА</small></div>
+      </div>
+      <div id="history"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="card-h">
+      <h2>Очки зрителей</h2>
+      <span class="row tight">
+        <span class="count">в таблице: <b id="lb-count">0</b> · с очками: <b id="lb-rich">0</b></span>
+        <button id="b-reset-points" class="sm ghost" type="button" title="Обнулить очки всех зрителей">Сбросить очки</button>
+      </span>
+    </div>
+    <div class="sub">Ставка — весь баланс: угадал — очки ×2, не угадал — сгорают все. <b>!3</b> — без ставки. Засчитывается только первая ставка зрителя в бою — поменять её нельзя. Стартовые 100 даются один раз — когда зритель впервые попадает в таблицу (написал <b>!join</b> или сделал первую ставку). Проиграл всё — остаётся 0 и не может ставить (его голос не принимается и не виден в «Голосах»), пока вы не начислите очки ниже; очки сохраняются между боями и сериями.</div>
+    <div class="give">
+      <div class="flood">
+        <label for="give-nick">Зрителю</label>
+        <input id="give-nick" class="nick" placeholder="ник (клик по строке таблицы)">
+        <input id="give-amt" class="amt" type="number" step="1" value="100" title="Сколько очков. Минус — снять.">
+        <button id="b-give" class="sm" type="button">Начислить</button>
+      </div>
+      <div class="flood">
+        <label for="give-all-amt">Всем в таблице</label>
+        <input id="give-all-amt" class="amt" type="number" step="1" value="100" title="Сколько очков каждому. Минус — снять.">
+        <button id="b-give-all" class="sm" type="button">Начислить всем</button>
+      </div>
+      <div class="flood wide">
+        <label for="give-pct">Всем процент</label>
+        <input id="give-pct" class="pct" type="number" step="any" min="0" value="10" title="Сколько процентов">
+        <label for="give-base">% от</label>
+        <input id="give-base" class="base" type="number" step="1" min="0" value="100000" title="От какой суммы">
+        <span class="each" id="give-each"></span>
+        <button id="b-give-pct" class="sm" type="button">Начислить всем</button>
+      </div>
+    </div>
+    <div id="give-msg"></div>
+    <div id="top"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2>Лог хоста</h2></div>
+    <div id="log"></div>
+  </section>
+</div>
+
+<script type="module">
+import { connect, post, get } from './js/net.js';
+
+const $ = id => document.getElementById(id);
+const PLATFORMS = { twitch: 'Twitch', kick: 'Kick' };
+const VOTE_SECONDS = [10, 15, 20, 30, 45, 60, 90, 120, 180];
+let state = { session: {}, adapters: {} };
+
+$('overlay-url').textContent = `${location.origin}/overlay.html?obs=1`;
+$('points-url').textContent = `${location.origin}/points.html`;
+$('open-overlay').href = '/overlay.html?obs=1';
+
+function fillVoteSeconds(current) {
+  const list = VOTE_SECONDS.includes(current) ? VOTE_SECONDS : [...VOTE_SECONDS, current].sort((a, b) => a - b);
+  $('vote-sec').innerHTML = list.map(n => `<option value="${n}">${n} с</option>`).join('');
+}
+fillVoteSeconds(30);
+
+/* ---------- rendering ---------- */
+
+const PHASE = { idle: 'ожидание', voting: 'ставки', fight: 'бой', result: 'победа', pause: 'пауза' };
+const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+let names = { fighter: 'ВЛАД', gorilla: 'ГОРИЛЛА' };
+const optName = c => c === 1 ? names.fighter : c === 2 ? names.gorilla : 'без ставки';
+
+function renderSession(s) {
+  if (!s) return;
+  const roundChanged = s.round !== state.session.round;
+  state.session = s;
+  if (s.names) {
+    names = s.names;
+    document.querySelectorAll('[data-name]').forEach(el => el.textContent = names[el.dataset.name]);
+    document.title = `${names.fighter} vs ${names.gorilla} — панель`;
+  }
+  if (roundChanged) { voters.clear(); votersTouch(); }
+
+  $('s-phase').textContent = PHASE[s.phase] || s.phase || '—';
+  const x = s.series;
+  $('s-round').textContent = x ? `${x.n}/${x.total}` : (s.round || 0);
+  $('s-round-k').textContent = x ? (x.over ? 'серия окончена' : 'бой серии') : 'бой №';
+  $('s-total').textContent = s.total || 0;
+  $('s-timer-k').textContent = s.phase === 'pause' ? 'до боя' : s.phase === 'fight' ? 'до KO' : 'до боя';
+  $('s-timer').textContent = s.phase === 'voting'
+    ? (s.waiting ? `ждём ${s.minVotes}` : `${s.left}s`)
+    : s.phase === 'pause' || s.phase === 'fight' ? `${s.left}s` : '—';
+
+  if (!VOTE_SECONDS.includes(s.voteSeconds) && !$('vote-sec').querySelector(`[value="${s.voteSeconds}"]`)) fillVoteSeconds(s.voteSeconds);
+  if ($('vote-sec').value !== String(s.voteSeconds)) $('vote-sec').value = String(s.voteSeconds);
+  $('auto').checked = !!s.autoLoop;
+  renderCharacters(s);
+  renderSeriesPick(s);
+
+  const voting = s.phase === 'voting';
+  $('b-start').textContent = voting ? 'Перезапустить голосование' : 'Открыть голосование';
+  $('b-start').disabled = s.phase === 'fight';
+  $('b-go').disabled = s.phase === 'fight';
+  $('b-skip').disabled = s.phase === 'idle';
+
+  const win = s.phase === 'result' ? (s.winner === 'fighter' ? 1 : 2) : 0;
+  $('opts').innerHTML = [1, 2, 3].map(c => {
+    const n = s.votes ? s.votes[c] : 0;
+    const p = pct(n, s.total);
+    return `<div class="opt${win === c ? ' win' : ''}">
+      <div class="opt-top">
+        <span class="opt-name"><span class="opt-n">!${c}</span>${esc(optName(c))}${win === c ? ' 🏆' : ''}</span>
+        <b>${n}<i>${p}%</i></b>
+      </div>
+      <div class="bar"><span style="width:${p}%"></span></div>
+    </div>`;
+  }).join('');
+
+  const r = $('result');
+  if (s.phase === 'result') {
+    const g = s.guessed || [];
+    r.hidden = false;
+    r.className = 'result';
+    const sc = s.score ? ` ${s.score[s.winner]}:${s.score[s.winner === 'fighter' ? 'gorilla' : 'fighter']}` : '';
+    const st = s.settled;
+    r.innerHTML = `<div class="big">Победил ${esc(names[s.winner])}${sc}</div>
+      <div class="sub">Угадали <b>${s.right}</b> из <b>${s.bets}</b> ставок${s.bets ? ` (${pct(s.right, s.bets)}%)` : ''}${g.length
+        ? `: ${g.map(esc).join(', ')}${s.right > g.length ? ` и ещё ${s.right - g.length}` : ''}` : ''}</div>
+      ${st ? `<div class="sub">Выплачено <b>+${st.paid}</b> очков · сгорело <b>${st.burned}</b> у ${st.lost} зрителей</div>` : ''}`;
+  } else {
+    r.hidden = true;
+  }
+
+  renderScore(s);
+}
+
+/* The corner pickers: the left character and the right one (the gorilla or another
+   roster character). Locked while bets are open or a fight is on, since viewers bet
+   on a name; whoever stands in one corner is greyed out in the other. */
+function renderCharacters(s) {
+  const list = s.characters || [];
+  const locked = s.phase === 'voting' || s.phase === 'fight';
+  const lockedTip = 'Можно сменить, когда нет ставок и боя: отмените бой или дождитесь результата.';
+  const pick = (id, options, value, taken) => {
+    const sel = $(id);
+    const key = options.map(c => c.id + ':' + c.name + ':' + (c.label || '')).join('|');
+    if (sel.dataset.key !== key) {
+      // the roster's label tells apart characters with the same name (Paver in white / red)
+      sel.innerHTML = options.map(c => `<option value="${esc(c.id)}">${esc(c.label || c.name)}</option>`).join('');
+      sel.dataset.key = key;
+    }
+    [...sel.options].forEach(o => o.disabled = o.value === taken);
+    if (value && sel.value !== value) sel.value = value;
+    sel.disabled = locked;
+  };
+  pick('char', list, s.character, s.opponent);
+  pick('opp', [{ id: 'gorilla', name: s.gorilla || 'ГОРИЛЛА' }, ...list], s.opponent || 'gorilla', s.character);
+  $('char-box').title = locked ? lockedTip : 'Кто стоит слева (!1). Экран победителя при смене закрывается.';
+  $('opp-box').title = locked ? lockedTip : 'Кто стоит справа (!2): горилла или другой персонаж. Экран победителя при смене закрывается.';
+}
+
+/* Series length: any number of fights, empty or 0 = off. Setting it starts the
+   count from the next fight; locked while bets are open or a fight is on. The
+   field is left alone while the streamer is typing in it. */
+function renderSeriesPick(s) {
+  const inp = $('series');
+  const total = s.series ? s.series.total : 0;
+  if (document.activeElement !== inp && !inp.dataset.dirty) inp.value = total ? String(total) : '';
+  const locked = s.phase === 'voting' || s.phase === 'fight';
+  inp.disabled = $('b-series').disabled = locked;
+  $('series-box').title = locked
+    ? 'Серию можно задать, когда нет ставок и боя.'
+    : 'Сколько боёв в серии (пусто или 0 — без серии). Отсчёт начинается со следующего боя; после последнего автоповтор останавливается. Повторное «Задать» начинает серию заново.';
+}
+
+function renderScore(s) {
+  const w = s.wins || {};
+  $('w-fighter').textContent = w.fighter || 0;
+  $('w-gorilla').textContent = w.gorilla || 0;
+  $('history').innerHTML = (s.history || []).map(h => {
+    const skip = h.result === 'skipped';         // fights from before bets replaced the skip vote
+    const t = new Date(h.at).toTimeString().slice(0, 5);
+    return `<div class="h">
+      <span class="n">${h.series ? `${h.series.n}/${h.series.total}` : '#' + h.round}</span>
+      <span class="w${skip ? ' skip' : ''}">${skip ? 'пропуск' : '🏆 ' + esc((h.names || names)[h.result]) + (h.score ? ` ${h.score[h.result]}:${h.score[h.result === 'fighter' ? 'gorilla' : 'fighter']}` : '')}<span class="n"> · ${t}</span></span>
+      <span class="v">${h[1]} : ${h[2]} · без ставки ${h[3]}${skip ? '' : `${h.crits ? ` · крит ${h.crits}` : ''} · угадали ${pct(h.right, h.bets ?? h.total)}%${h.paid != null ? ` · +${h.paid}/−${h.burned}` : ''}`}</span>
+    </div>`;
+  }).join('') || '<div class="empty">боёв ещё не было</div>';
+}
+
+function renderTop(top) {
+  if (!top) return;
+  $('lb-count').textContent = top.length;
+  $('lb-rich').textContent = top.filter(p => p.points > 0).length;
+  $('top').innerHTML = top.map((p, i) => {
+    const plat = p.platform === 'twitch' || p.platform === 'kick' ? p.platform : 'local';
+    return `<div class="lb${p.points > 0 ? '' : ' zero'}" data-nick="${esc(p.display || p.key)}" title="Подставить ник для начисления">
+      <span class="n">${i + 1}</span>
+      <span class="pl ${plat}">${plat}</span>
+      <span class="nick">${esc(p.display || p.key)}</span>
+      <span class="pts">${p.points.toLocaleString('ru-RU')}</span>
+      <span class="wl" title="угадал / не угадал">${p.wins || 0}/${p.losses || 0}</span>
+    </div>`;
+  }).join('') || '<div class="empty">в таблице пока никого — зрители попадают сюда, написав в чат !join</div>';
+}
+
+function renderAdapters(a) {
+  if (!a) return;
+  state.adapters = a;
+  $('platforms').innerHTML = Object.entries(PLATFORMS).map(([k, label]) => {
+    const d = a[k] || { status: 'off' };
+    return `<div class="plat">
+      <div class="plat-h">
+        <span class="plat-l"><i class="dot ${d.status}"></i><span class="name">${label}</span></span>
+        <span class="plat-r">
+          <span class="tag ${d.writable ? 'on' : ''}">${d.writable ? 'чтение+запись' : 'только чтение'}</span>
+          ${d.transport === 'relay'
+            ? (d.linked
+                ? `<button class="sm" data-cmd="unlink" data-plat="${k}" type="button">отвязать</button>`
+                : `<button class="sm primary" data-link="${k}" type="button">Подключить ${label}</button>
+                   <input class="claim" data-claim-slug="${k}" type="text" placeholder="ник канала" size="12"
+                          value="${esc(d.channel || d.wantChannel || '')}" title="Привязать канал без авторизации владельца — только чтение чата">
+                   <button class="sm" data-claim="${k}" type="button" title="Подписаться на чат этого канала без авторизации владельца. Бот сможет только читать.">привязать по нику</button>`)
+            : d.authorized
+              ? `<button class="sm" data-cmd="logout" data-plat="${k}" type="button">выйти</button>`
+              : `<a class="tag" href="/auth/${k}">авторизовать</a>`}
+          <button class="sm" data-cmd="reconnect" data-plat="${k}" type="button" title="Переподключить">↻</button>
+        </span>
+      </div>
+      <div class="detail"><span class="st ${d.status}">${d.status}</span>${d.detail ? '<span>' + esc(d.detail) + '</span>' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+/* The panel keeps its own copy of the round's voters: the host sends them once
+   in `hello` and then only 'vote' events, so the once-a-second push stays small. */
+const voters = new Map();
+let votersDirty = false;
+
+function votersTouch() {
+  if (votersDirty) return;
+  votersDirty = true;
+  // A flood lands a hundred votes in one frame; coalesce them into one repaint.
+  requestAnimationFrame(renderVoters);
+}
+
+function renderVoters() {
+  votersDirty = false;
+  $('v-count').textContent = voters.size;
+  $('voters').innerHTML = [...voters.values()].map(p => {
+    const plat = p.platform === 'twitch' || p.platform === 'kick' ? p.platform : 'local';
+    return `<div class="ppl">
+      <span class="pl ${plat}">${plat}</span>
+      <span class="nick">${esc(p.display || p.key)}</span>
+      <span class="ch c${p.choice}">!${p.choice} ${esc(optName(p.choice))}</span>
+    </div>`;
+  }).join('') || '<div class="empty">пока никто не голосовал</div>';
+}
+
+function addLog(rec) {
+  const el = $('log');
+  const near = el.scrollTop + el.clientHeight > el.scrollHeight - 40;
+  const t = new Date(rec.at).toTimeString().slice(0, 8);
+  const extra = rec.extra == null ? '' : ' ' + (typeof rec.extra === 'string' ? rec.extra : JSON.stringify(rec.extra));
+  const line = document.createElement('div');
+  line.className = rec.level;
+  line.innerHTML = `<span class="t">${t}</span> <span class="scope">${rec.scope}</span> ${esc(rec.msg + extra)}`;
+  el.append(line);
+  while (el.childElementCount > 300) el.firstElementChild.remove();
+  if (near) el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- transport ---------- */
+
+connect('control', m => {
+  if (m.t === 'hello') {
+    renderSession(m.session);
+    renderAdapters(m.adapters);
+    renderTop(m.top);
+    $('log').innerHTML = '';
+    (m.log || []).forEach(addLog);
+    voters.clear();
+    for (const p of m.voters || []) voters.set(p.key, p);
+    votersTouch();
+  } else if (m.t === 'state') renderSession(m.session);
+  else if (m.t === 'status') renderAdapters(m.adapters);
+  else if (m.t === 'points') renderTop(m.top);
+  else if (m.t === 'log') addLog(m.rec);
+  else if (m.t === 'vote' && m.round === state.session.round) { voters.set(m.key, m); votersTouch(); }
+}, s => {
+  $('hoststate').textContent = s === 'connected' ? 'на связи' : 'переподключение…';
+  $('hostpill').className = 'pill ' + (s === 'connected' ? 'up' : 'down');
+});
+
+async function refresh() {
+  const r = await get('/api/state');
+  if (r.ok) { renderSession(r.session); renderAdapters(r.adapters); renderTop(r.top); $('overlays').textContent = r.overlays; }
+}
+refresh();
+setInterval(refresh, 4000);
+
+/* ---------- actions ---------- */
+
+const cmd = (name, extra) => post('/api/cmd', Object.assign({ name }, extra));
+
+$('b-start').onclick = () => cmd('start');
+$('b-go').onclick = () => cmd('go');
+$('b-skip').onclick = () => cmd('skip');
+$('b-reset').onclick = () => cmd('reset');
+/* Wiping everyone's points can't be undone, so it takes a second click within 4 s. */
+let pointsArmed = null;
+$('b-reset-points').onclick = () => {
+  const b = $('b-reset-points');
+  if (!pointsArmed) {
+    b.textContent = 'Точно сбросить всем?'; b.classList.add('danger');
+    pointsArmed = setTimeout(() => { pointsArmed = null; b.textContent = 'Сбросить очки'; b.classList.remove('danger'); }, 4000);
+    return;
+  }
+  clearTimeout(pointsArmed); pointsArmed = null;
+  b.textContent = 'Сбросить очки'; b.classList.remove('danger');
+  cmd('resetPoints');
+};
+$('vote-sec').onchange = e => cmd('voteSeconds', { value: +e.target.value });
+
+/* Granting points. A minus amount takes them away (never below 0). Everyone
+   means everyone who has ever bet, wiped balances included; the second click
+   within 4 s confirms it. */
+function giveMsg(text, cls) { const m = $('give-msg'); m.textContent = text; m.className = cls || ''; }
+const amountOf = id => Math.round(+$(id).value) || 0;
+$('top').addEventListener('click', e => {
+  const row = e.target.closest('[data-nick]');
+  if (row) { $('give-nick').value = row.dataset.nick; $('give-amt').focus(); $('give-amt').select(); }
+});
+async function giveOne() {
+  const nick = $('give-nick').value.trim(), value = amountOf('give-amt');
+  if (!nick) { $('give-nick').focus(); return; }
+  if (!value) { giveMsg('Укажите, сколько очков (не 0)', 'bad'); return; }
+  const r = await cmd('givePoints', { nick, value });
+  if (!r.ok) return giveMsg(r.error || 'не получилось', 'bad');
+  renderTop(r.top);
+  giveMsg(r.hits.map(h => `${h.display} (${h.platform}): ${value > 0 ? '+' : ''}${value} → ${h.points.toLocaleString('ru-RU')}`).join(' · '), 'ok');
+}
+$('b-give').onclick = giveOne;
+[$('give-nick'), $('give-amt')].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') giveOne(); }));
+/* "Всем процент": N % of a sum to each viewer, e.g. 10 % of 100 000 = 10 000 each. */
+const pctEach = () => Math.round((+$('give-base').value || 0) * (+$('give-pct').value || 0) / 100);
+function showPctEach() {
+  const v = pctEach();
+  $('give-each').innerHTML = v > 0 ? `= <b>${v.toLocaleString('ru-RU')}</b> каждому` : '';
+}
+[$('give-pct'), $('give-base')].forEach(el => el.addEventListener('input', showPctEach));
+showPctEach();
+
+/* Both "everyone" buttons ask once more within 4 s before they pay out. */
+const giveAllArmed = new Map();
+async function giveAll(b, value) {
+  if (!value) { giveMsg('Укажите, сколько очков (не 0)', 'bad'); return; }
+  if (!giveAllArmed.has(b)) {
+    b.textContent = `Точно ${value > 0 ? '+' : ''}${value.toLocaleString('ru-RU')} всем?`; b.classList.add('danger');
+    giveAllArmed.set(b, setTimeout(() => { giveAllArmed.delete(b); b.textContent = 'Начислить всем'; b.classList.remove('danger'); }, 4000));
+    return;
+  }
+  clearTimeout(giveAllArmed.get(b)); giveAllArmed.delete(b);
+  b.textContent = 'Начислить всем'; b.classList.remove('danger');
+  const r = await cmd('givePointsAll', { value });
+  if (!r.ok) return giveMsg(r.error || 'не получилось', 'bad');
+  renderTop(r.top);
+  giveMsg(r.count ? `${value > 0 ? '+' : ''}${value.toLocaleString('ru-RU')} очков — ${r.count} зрителям` : 'В таблице пока никого нет', r.count ? 'ok' : 'bad');
+}
+$('b-give-all').onclick = e => giveAll(e.currentTarget, amountOf('give-all-amt'));
+$('b-give-pct').onclick = e => giveAll(e.currentTarget, pctEach());
+$('char').onchange = e => cmd('character', { value: e.target.value });
+$('opp').onchange = e => cmd('opponent', { value: e.target.value });
+function applySeries() {
+  const inp = $('series');
+  const n = Math.max(0, Math.min(500, Math.round(+inp.value) || 0));
+  delete inp.dataset.dirty;
+  inp.blur();
+  cmd('series', { value: n });
+}
+$('series').oninput = e => { e.target.dataset.dirty = '1'; };
+$('series').onkeydown = e => { if (e.key === 'Enter') applySeries(); };
+$('b-series').onclick = applySeries;
+$('auto').onchange = e => cmd('auto', { value: e.target.checked });
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cmd]');
+  if (b) cmd(b.dataset.cmd, { platform: b.dataset.plat }).then(refresh);
+  const f = e.target.closest('[data-fill]');
+  if (f) { $('i-text').value = f.dataset.fill; inject(); }
+
+  const c = e.target.closest('[data-claim]');
+  if (c) {
+    const k = c.dataset.claim;
+    const field = document.querySelector(`[data-claim-slug="${k}"]`);
+    const slug = (field && field.value.trim()) || '';
+    if (!slug) { field && field.focus(); return; }
+    c.disabled = true;
+    // Привязка без авторизации владельца: релей подписывается своим токеном,
+    // поэтому бот сможет только читать чат.
+    post('/api/cmd', { name: 'claim', platform: k, value: slug }).then(r => {
+      c.disabled = false;
+      if (!r.ok) c.title = 'Не удалось привязать канал: ' + (r.error || 'неизвестная ошибка');
+      refresh();
+    });
+  }
+
+  const l = e.target.closest('[data-link]');
+  if (l) {
+    l.disabled = true;
+    post('/api/cmd', { name: 'link', platform: l.dataset.link }).then(r => {
+      l.disabled = false;
+      // The relay hands back a one-time URL; the streamer approves on Kick itself.
+      if (r.ok && r.url) window.open(r.url, '_blank', 'noopener');
+      else l.title = 'Не удалось получить ссылку: ' + (r.error || 'неизвестная ошибка');
+    });
+  }
+});
+
+function inject(over) {
+  const nick = (over && over.nick) || $('i-nick').value.trim() || 'tester';
+  return post('/api/chat/inject', {
+    platform: $('i-plat').value,
+    userId: nick.toLowerCase(),
+    display: nick,
+    text: (over && over.text) || $('i-text').value,
+    roles: {},
+  });
+}
+$('b-inject').onclick = () => inject();
+$('i-text').addEventListener('keydown', e => { if (e.key === 'Enter') inject(); });
+
+$('b-flood').onclick = async () => {
+  const n = Math.max(1, Math.min(500, +$('i-n').value || 25));
+  for (let i = 0; i < n; i++) {
+    const nick = 'test_' + Math.random().toString(36).slice(2, 8);
+    const r = Math.random();
+    await inject({ nick, text: r < 0.45 ? '!1' : r < 0.9 ? '!2' : '!3' });
+  }
+};
+</script>

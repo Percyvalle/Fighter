@@ -1,0 +1,10 @@
+.tokens.json
+config.json
+node_modules/
+.agent.json
+points.json
+points.json.tmp
+.env
+data/
+points.json.bak
+points.json.broken-*

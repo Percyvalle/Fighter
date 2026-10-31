@@ -1,0 +1,43 @@
+{
+  "host": "127.0.0.1",
+  "port": 7778,
+  "publicUrl": "",
+  "allowedHosts": [],
+
+  "game": {
+    "names": { "fighter": "ВЛАД", "gorilla": "ГОРИЛЛА" },
+    "voteSeconds": 30,
+    "resultSeconds": 6,
+    "autoLoop": false,
+    "pauseSeconds": 10,
+    "minVotes": 0,
+    "antiStreak": [40, 25, 10]
+  },
+
+  "points": {
+    "start": 100
+  },
+
+  "replies": "minimal",
+
+  "commands": {
+    "voteRoles": ["everyone"]
+  },
+
+  "twitch": {
+    "enabled": true,
+    "channel": "your_twitch_login",
+    "clientId": "",
+    "clientSecret": "",
+    "transport": "auto"
+  },
+
+  "kick": {
+    "enabled": true,
+    "channel": "your-kick-slug",
+    "clientId": "",
+    "clientSecret": "",
+    "transport": "ws",
+    "chatroomId": 0
+  }
+}

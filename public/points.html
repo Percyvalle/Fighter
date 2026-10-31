@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Очки зрителей — overlay</title>
+<style>
+  /* Leaderboard for its own OBS Browser Source (e.g. 520x720). Transparent page,
+     same arcade look as overlay.html. ?rows=N sets how many places to show. */
+  :root {
+    --hp-red: #d10a0a;
+    --hp-orange: #ff8a00;
+    --hp-yellow: #ffd23f;
+    --frame: #ffffff;
+    --ink: #0b0b12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: transparent;
+    color: #fff;
+    font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", "Arial Black", sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  .board {
+    width: min(100vw - 24px, 560px);
+    margin: 12px auto;
+    display: grid;
+    gap: 8px;
+  }
+  .title {
+    justify-self: center;
+    padding: 6px 28px 8px;
+    transform: skewX(-15deg);
+    background: linear-gradient(90deg, rgba(160,0,0,0.9), rgba(10,10,18,0.92) 30%, rgba(10,10,18,0.92) 70%, rgba(160,0,0,0.9));
+    border: 2px solid var(--frame);
+    box-shadow: 0 0 0 2px var(--ink), 0 8px 24px rgba(0,0,0,0.7);
+    font-size: clamp(20px, 5vw, 34px);
+    letter-spacing: 0.1em;
+    font-style: italic;
+  }
+  .title span { display: inline-block; transform: skewX(15deg); }
+  .title b { color: var(--hp-yellow); font-weight: normal; }
+  .row {
+    display: grid;
+    grid-template-columns: 2.4em minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0.35em 0.9em 0.35em 0.6em;
+    transform: skewX(-12deg);
+    background: rgba(10, 10, 18, 0.82);
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 0 0 2px var(--ink), 0 6px 16px rgba(0,0,0,0.6);
+    font-size: clamp(16px, 4.2vw, 26px);
+    letter-spacing: 0.04em;
+  }
+  .row > * { transform: skewX(12deg); }
+  .row .n { text-align: center; color: var(--hp-yellow); text-shadow: 0 0 8px rgba(255,180,0,0.6); font-style: italic; }
+  /* overflow:hidden clips below the baseline; the padding keeps "_" in nicknames visible */
+  .row .nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; padding-bottom: 0.12em; }
+  .row .pts { font-variant-numeric: tabular-nums; color: #fff; }
+  .row.p1 {
+    background: linear-gradient(90deg, rgba(255,210,63,0.35), rgba(10,10,18,0.85) 70%);
+    border-color: var(--hp-yellow);
+    font-size: clamp(18px, 4.8vw, 30px);
+  }
+  .row.p1 .pts {
+    background: linear-gradient(180deg, #fff9d6 0%, #ffd23f 45%, #ff7a00 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    padding: 0 0.15em;
+  }
+  /* the gold row: the rank goes white, gold on gold would vanish */
+  .row.p1 .n { color: #fff; -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 rgba(0,0,0,0.6); }
+  .row.p2, .row.p3 { border-color: var(--hp-orange); }
+  /* a row whose balance just changed */
+  .row.up { animation: up 1.2s ease-out; }
+  .row.down { animation: down 1.2s ease-out; }
+  @keyframes up { 0% { box-shadow: 0 0 0 2px var(--ink), 0 0 26px rgba(255,210,63,0.95); } 100% { box-shadow: 0 0 0 2px var(--ink), 0 6px 16px rgba(0,0,0,0.6); } }
+  @keyframes down { 0% { box-shadow: 0 0 0 2px var(--ink), 0 0 26px rgba(209,10,10,0.95); } 100% { box-shadow: 0 0 0 2px var(--ink), 0 6px 16px rgba(0,0,0,0.6); } }
+  .empty {
+    justify-self: center;
+    padding: 0.6em 1.2em;
+    transform: skewX(-12deg);
+    background: rgba(10,10,18,0.75);
+    border: 2px dashed rgba(255,255,255,0.5);
+    font-size: clamp(14px, 3.4vw, 20px);
+    letter-spacing: 0.06em;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <div class="board">
+    <div class="title"><span>ТОП <b>ОЧКОВ</b></span></div>
+    <div id="rows"></div>
+  </div>
+<script>
+  const ROWS = Math.max(1, Math.min(20, parseInt(new URLSearchParams(location.search).get("rows"), 10) || 10));
+  const esc = s => String(s).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  let last = new Map();        // key -> points shown before, to flash the rows that moved
+
+  function render(top) {
+    const list = (top || []).slice(0, ROWS);
+    const box = document.getElementById("rows");
+    box.style.display = "grid"; box.style.gap = "8px";
+    box.innerHTML = list.map((p, i) => {
+      const was = last.get(p.key);
+      const moved = was === undefined ? "" : p.points > was ? " up" : p.points < was ? " down" : "";
+      return `<div class="row p${i + 1}${moved}">
+        <span class="n">${i + 1}</span>
+        <span class="nick">${esc(p.display || p.key)}</span>
+        <span class="pts">${p.points.toLocaleString("ru-RU")}</span>
+      </div>`;
+    }).join("") || '<div class="empty">НАПИШИТЕ !JOIN В ЧАТ, ЧТОБЫ ПОПАСТЬ В ТАБЛИЦУ</div>';
+    last = new Map(list.map(p => [p.key, p.points]));
+  }
+
+  (function connect() {
+    let retry = 0;
+    const open = () => {
+      const es = new EventSource("/events?role=points");
+      es.onopen = () => { retry = 0; };
+      es.onmessage = ev => {
+        let m; try { m = JSON.parse(ev.data); } catch { return; }
+        if (m.t === "hello" || m.t === "points") render(m.top);
+      };
+      es.onerror = () => { es.close(); retry = Math.min(retry + 1, 6); setTimeout(open, 250 * 2 ** retry); };
+    };
+    open();
+  })();
+</script>
+</body>
+</html>
