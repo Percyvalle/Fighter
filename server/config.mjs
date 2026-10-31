@@ -1,5 +1,5 @@
-/* Configuration: config.json (optional) <- defaults, with env overrides on top.
-   Secrets live in config.json or the environment; they never reach the browser. */
+/* Configuration: data/config.json (optional) <- defaults, with env overrides on top.
+   Secrets live in data/config.json or the environment; they never reach the browser. */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -119,12 +119,12 @@ export const clampVote = v => Math.max(5, Math.min(600, +v || 30));
 
 export function loadConfig() {
   let file = {};
-  const path = resolve(ROOT, 'config.json');
+  const path = resolve(ROOT, process.env.CONFIG_FILE || 'data/config.json');
   if (existsSync(path)) {
     try { file = JSON.parse(readFileSync(path, 'utf8')); }
-    catch (e) { log.error(`config.json is not valid JSON: ${e.message}`); process.exit(1); }
+    catch (e) { log.error(`${path} is not valid JSON: ${e.message}`); process.exit(1); }
   } else {
-    log.warn('config.json not found — running on defaults (no channels configured)');
+    log.warn(`${path} not found — running on defaults (no channels configured)`);
   }
   const cfg = fromEnv(deepMerge(DEFAULTS, file));
 

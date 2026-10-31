@@ -12,9 +12,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-rem Порт берём из config.json, чтобы батник не разъехался с настройками.
+rem Порт берём из data\config.json, чтобы батник не разъехался с настройками.
 set PORT=7778
-for /f "usebackq delims=" %%p in (`node -e "try{process.stdout.write(String(JSON.parse(require('fs').readFileSync('config.json','utf8')).port||7778))}catch(e){process.stdout.write('7778')}"`) do set PORT=%%p
+for /f "usebackq delims=" %%p in (`node -e "try{process.stdout.write(String(JSON.parse(require('fs').readFileSync('data/config.json','utf8')).port||7778))}catch(e){process.stdout.write('7778')}"`) do set PORT=%%p
 
 rem Две копии хоста ходят на релей под одним data\.agent.json: релей отцепляет
 rem предыдущее соединение, хост переподключается, и так по кругу. Поэтому

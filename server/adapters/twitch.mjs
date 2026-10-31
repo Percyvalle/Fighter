@@ -203,7 +203,7 @@ export class TwitchAdapter extends Adapter {
       this.setStatus('connecting', `irc - joining #${this.channel}`);
       clearTimeout(this.joinTimer);
       this.joinTimer = setTimeout(() => {
-        this.fatal(`#${this.channel}: Twitch did not confirm the channel - check twitch.channel in config.json`);
+        this.fatal(`#${this.channel}: Twitch did not confirm the channel - check twitch.channel in data/config.json`);
         try { ws.close(); } catch {}
       }, 10000);
     });

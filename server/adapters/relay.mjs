@@ -58,7 +58,7 @@ export class RelayAdapter extends Adapter {
   async connect() {
     if (this.stopped) return;
     if (!this.base) {
-      this.fatal('kick.relayUrl не задан в config.json');
+      this.fatal('kick.relayUrl не задан в data/config.json');
       return;
     }
 

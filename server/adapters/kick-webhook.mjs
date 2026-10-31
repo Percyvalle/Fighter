@@ -118,7 +118,7 @@ export class KickWebhookAdapter extends Adapter {
     if (this.stopped || !this.channel) return;
 
     if (!this.cfg.kick.clientId || !this.cfg.kick.clientSecret) {
-      this.fatal('kick.clientId / kick.clientSecret are not set in config.json');
+      this.fatal('kick.clientId / kick.clientSecret are not set in data/config.json');
       return;
     }
     if (!getTokens('kick')) {

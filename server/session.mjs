@@ -40,7 +40,7 @@ export class Session {
     this.closingSaid = false;
     // The corners: the left one is one of public/js/roster.js, the right one the
     // gorilla or another roster character in its place, both picked in the panel.
-    // Vlad and the gorilla keep their names from config.json (game.names); the
+    // Vlad and the gorilla keep their names from data/config.json (game.names); the
     // others use the roster's, or game.characters.<id> if set there. The sides stay
     // 'fighter' and 'gorilla' whoever stands there: !1 is left, !2 is right.
     this.vladName = cfg.game.names.fighter;

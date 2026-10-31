@@ -37,7 +37,7 @@ export function authorizeUrl(cfg, platform) {
 
   let url;
   if (platform === 'twitch') {
-    if (!cfg.twitch.clientId || !cfg.twitch.clientSecret) throw new Error('twitch.clientId / twitch.clientSecret are not set in config.json');
+    if (!cfg.twitch.clientId || !cfg.twitch.clientSecret) throw new Error('twitch.clientId / twitch.clientSecret are not set in data/config.json');
     const q = new URLSearchParams({
       client_id: cfg.twitch.clientId,
       redirect_uri: redirectUri(cfg, 'twitch'),
@@ -48,7 +48,7 @@ export function authorizeUrl(cfg, platform) {
     });
     url = `${TWITCH.authorize}?${q}`;
   } else {
-    if (!cfg.kick.clientId || !cfg.kick.clientSecret) throw new Error('kick.clientId / kick.clientSecret are not set in config.json');
+    if (!cfg.kick.clientId || !cfg.kick.clientSecret) throw new Error('kick.clientId / kick.clientSecret are not set in data/config.json');
     const verifier = base64url(randomBytes(48));
     entry.verifier = verifier;
     const challenge = base64url(createHash('sha256').update(verifier).digest());

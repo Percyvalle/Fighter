@@ -100,7 +100,7 @@ export class KickAdapter extends Adapter {
       });
       if (r.status === 403) {
         // Cloudflare fronts this endpoint; no amount of retrying gets past it.
-        this.fatal('Cloudflare blocked the channel lookup - set kick.chatroomId in config.json (README: "Kick за минуту")');
+        this.fatal('Cloudflare blocked the channel lookup - set kick.chatroomId in data/config.json (README: "Kick за минуту")');
         throw new Error('channel lookup blocked');
       }
       if (!r.ok) throw new Error(`channel lookup -> ${r.status}`);
