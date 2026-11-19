@@ -480,6 +480,102 @@
   .commands:not(.live) .meter { opacity: 0; }
   .commands.live .cnt { display: inline; }
 
+  /* Recent voters sit above the chat commands, then leave the stage with them. */
+  .vote-panel {
+    position: fixed;
+    z-index: 11;
+    left: 8vw;
+    right: 8vw;
+    bottom: 12vh;
+    padding: 1.2vh 2vw 1.6vh;
+    background: linear-gradient(90deg, rgba(135,8,8,.88), rgba(10,10,18,.94) 24%, rgba(10,10,18,.94) 76%, rgba(135,8,8,.88));
+    border: 2px solid var(--frame);
+    box-shadow: 0 0 0 2px var(--ink), 0 8px 24px rgba(0,0,0,.7);
+    transform: translateY(0) skewX(-10deg);
+    opacity: 1;
+    transition: transform .85s cubic-bezier(.65,0,.25,1), opacity .7s ease;
+  }
+  .vote-panel[hidden] { display: none; }
+  .vote-panel.leaving { transform: translateY(150%) skewX(-10deg); opacity: 0; pointer-events: none; }
+  .vote-panel-inner { transform: skewX(10deg); }
+  .vote-panel-title {
+    text-align: center;
+    color: var(--hp-yellow);
+    font-size: clamp(18px, 3.2vh, 38px);
+    font-style: italic;
+    letter-spacing: .09em;
+    text-shadow: 2px 2px 0 var(--ink);
+  }
+  .vote-panel-platforms {
+    display: flex;
+    justify-content: center;
+    gap: 1.2em;
+    margin: .4vh 0 .8vh;
+    font: 700 clamp(11px, 1.5vh, 16px) Arial, sans-serif;
+  }
+  .vote-panel-platforms span[hidden] { display: none; }
+  .vote-panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; }
+  .vote-side { min-width: 0; }
+  .vote-side:last-child { text-align: right; }
+  .vote-side-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1vw;
+    padding-bottom: .4vh;
+    border-bottom: 1px solid rgba(255,255,255,.4);
+    font-size: clamp(16px, 2.6vh, 30px);
+    font-style: italic;
+    letter-spacing: .08em;
+  }
+  .vote-side:last-child .vote-side-head { flex-direction: row-reverse; }
+  .vote-side-head b { color: var(--hp-yellow); font-weight: normal; }
+  .vote-side-head > span { font-size: .75em; }
+  .vote-nicks {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: start;
+    gap: .6vh .5vw;
+    min-height: 6vh;
+    max-height: 9vh;
+    overflow: hidden;
+    padding-top: .9vh;
+  }
+  .vote-side:last-child .vote-nicks { justify-content: flex-end; }
+  .vote-nick {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    max-width: 12vw;
+    min-width: 0;
+    padding: .35vh .6vw;
+    background: rgba(255,255,255,.13);
+    border: 1px solid rgba(255,255,255,.22);
+    font: 700 clamp(12px, 1.8vh, 21px) Arial, sans-serif;
+  }
+  .vote-nick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vote-nick.more { color: var(--hp-yellow); background: rgba(0,0,0,.35); white-space: nowrap; }
+  .platform-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+    border-radius: 2px;
+    font: 900 .8em Arial, sans-serif;
+  }
+  .platform-mark.twitch { background: #9146ff; color: #fff; }
+  .platform-mark.kick { background: #53fc18; color: #092008; }
+  .commands-holder.vote-out { transform: translateY(160%); opacity: 0; pointer-events: none; }
+  .commands-holder { transition: transform .85s cubic-bezier(.65,0,.25,1), opacity .7s ease; }
+  @media (max-width: 700px) {
+    .vote-panel { left: 3vw; right: 3vw; bottom: 17vh; padding: 1vh 2vw; }
+    .vote-nicks { min-height: 9vh; max-height: 14vh; }
+    .vote-nick { max-width: 36vw; font-size: 11px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vote-panel, .commands-holder { transition-duration: .01ms; }
+  }
+
   /* ---------- Screen shake ---------- */
   body.shake .stage,
   body.shake .hud,
@@ -564,6 +660,26 @@
       <span class="opt"><span class="cmd">!2</span> - <span data-name="gorilla">ГОРИЛЛА</span><b class="cnt" id="cnt-2"></b><i class="meter" id="meter-2"></i></span>
       <span class="sep">|</span>
       <span class="opt"><span class="cmd">!3</span> - БЕЗ СТАВКИ<b class="cnt" id="cnt-3"></b><i class="meter" id="meter-3"></i></span>
+    </div>
+  </div>
+
+  <div class="vote-panel" id="vote-panel" hidden>
+    <div class="vote-panel-inner">
+      <div class="vote-panel-title">ПОСЛЕДНИЕ ГОЛОСА</div>
+      <div class="vote-panel-platforms">
+        <span id="vote-platform-twitch" hidden><i class="platform-mark twitch">T</i> Twitch</span>
+        <span id="vote-platform-kick" hidden><i class="platform-mark kick">K</i> Kick</span>
+      </div>
+      <div class="vote-panel-grid">
+        <div class="vote-side">
+          <div class="vote-side-head"><b>!1 · <span data-name="fighter">ВЛАД</span></b><span id="vote-count-1">0 голосов</span></div>
+          <div class="vote-nicks" id="vote-nicks-1"></div>
+        </div>
+        <div class="vote-side">
+          <div class="vote-side-head"><b><span data-name="gorilla">ГОРИЛЛА</span> · !2</b><span id="vote-count-2">0 голосов</span></div>
+          <div class="vote-nicks" id="vote-nicks-2"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -901,7 +1017,7 @@
   // Each file has its own sync mark. The gorilla also gets a low thud on contact.
   const vladPunches = [1, 2, 3].map(n => clip(`assets/sfx/vlad-punch-${n}.mp3`));
   const BEAST_SFX = { clips: [1, 2].map(n => clip(`assets/sfx/gorilla-swing-${n}.mp3`)), last: -1,
-                      thud: { clips: vladPunches, rate: 0.72, volume: 0.95 } };
+                      thud: { clips: vladPunches, volume: 0.95 } };
   const SFX = { fighter: { clips: vladPunches, last: -1 }, gorilla: BEAST_SFX };
 
   /* A roster character's own sounds (roster `sfx`), in either corner: punches in place
@@ -972,6 +1088,9 @@
   function playVoice(a, volume, ms, onDone) {
     if (!a || !VOLUME) return;
     const generation = voiceGeneration;
+    // Keep recordings at their prepared speed and pitch, including crits and KOs.
+    a.playbackRate = 1;
+    a.preservesPitch = true;
     a.volume = VOLUME * volume;
     later(() => {
       if (generation !== voiceGeneration) return;
@@ -1032,30 +1151,21 @@
       const hurt = pick(VOICE[def].hurt);
       schedule(() => playVoice(hurt, HURT_LEVEL * (hit.crit || hit.ko ? 0.95 : 0.8), 0), TIMING.contact + 60);
     }
-    // The gorilla yelps when it is hit, whoever hits it: one clip, so the pitch
-    // drifts a little; a crit or the KO lands it lower and louder.
+    // The gorilla yelps when hit; a crit or KO changes only its volume.
     if (!CAST[def]) {
       const y = gorillaYelp.cloneNode();
-      y.preservesPitch = false;
-      y.playbackRate = hit.crit || hit.ko ? 0.88 : 0.95 + Math.random() * 0.12;
       schedule(() => playVoice(y, HURT_LEVEL * (hit.crit || hit.ko ? 0.9 : 0.7), 0), TIMING.contact + 50);
     }
-    // Never the same clip twice in a row, and a slight random pitch, so a run of
-    // punches doesn't sound like one sample on repeat.
+    // Vary the recording without changing its speed or pitch.
     const a = pick(set);
-    // A crit or the KO lands heavier: full volume, pitched down.
+    // A crit or KO lands heavier through volume.
     const heavy = hit.crit || hit.ko;
-    a.preservesPitch = !!a.cue?.voice;
-    a.playbackRate = a.cue?.voice ? 1 : heavy ? 0.82 : 0.94 + Math.random() * 0.12;
-    // A slower clip reaches its peak later, so start it that much earlier.
     // A crit has its own spoken line; do not layer a second Vlad line over it.
     if (!(hit.crit && VOICE[hit.by].crit && a.cue?.voice)) {
-      schedule(() => playVoice(a, heavy ? 1 : 0.85, 0), TIMING.contact - (a.cue?.peakMs || 0) / a.playbackRate);
+      schedule(() => playVoice(a, heavy ? 1 : 0.85, 0), TIMING.contact - (a.cue?.peakMs || 0));
     }
     if (set.thud) {
       const t = set.thud.clips[Math.floor(Math.random() * set.thud.clips.length)].cloneNode();
-      t.preservesPitch = false;
-      t.playbackRate = set.thud.rate * (heavy ? 0.9 : 0.97 + Math.random() * 0.06);
       schedule(() => playVoice(t, set.thud.volume, 0), TIMING.contact);
     }
     const crit = VOICE[hit.by].crit;
@@ -1064,8 +1174,6 @@
     }
     if (!CAST[hit.by]) {
       const roar = gorillaRoar.cloneNode();
-      roar.preservesPitch = false;
-      roar.playbackRate = heavy ? 0.9 : 0.95 + Math.random() * 0.1;
       schedule(() => playVoice(roar, heavy ? 0.75 : 0.6, 0), TIMING.contact - 380);
     }
     schedule(() => duckMusic(hit.ko), TIMING.contact);
@@ -1330,6 +1438,63 @@
     }
   }
 
+  let votePanelTimer = null;
+
+  function renderVotePanel(s) {
+    const display = s.voteDisplay || { recent: { 1: [], 2: [] }, platforms: {} };
+    for (const platform of ["twitch", "kick"]) {
+      $("vote-platform-" + platform).hidden = !(display.platforms?.[platform] > 0);
+    }
+    for (const side of [1, 2]) {
+      const count = s.votes?.[side] || 0;
+      $("vote-count-" + side).textContent = `${count} ${plural(count, "голос", "голоса", "голосов")}`;
+      const list = $("vote-nicks-" + side);
+      const recent = display.recent?.[side] || [];
+      const items = [];
+      if (count > recent.length) {
+        const more = document.createElement("span");
+        more.className = "vote-nick more";
+        more.textContent = `+${count - recent.length}`;
+        items.push(more);
+      }
+      for (const voter of recent) {
+        const chip = document.createElement("span");
+        chip.className = "vote-nick";
+        if (voter.platform === "twitch" || voter.platform === "kick") {
+          const mark = document.createElement("i");
+          mark.className = "platform-mark " + voter.platform;
+          mark.textContent = voter.platform === "twitch" ? "T" : "K";
+          mark.title = voter.platform === "twitch" ? "Twitch" : "Kick";
+          chip.append(mark);
+        }
+        const name = document.createElement("span");
+        name.className = "vote-nick-name";
+        name.textContent = voter.display;
+        chip.append(name);
+        items.push(chip);
+      }
+      list.replaceChildren(...items);
+    }
+  }
+
+  function showVotePanel(s) {
+    clearTimeout(votePanelTimer);
+    const panel = $("vote-panel");
+    panel.hidden = false;
+    panel.classList.remove("leaving");
+    els.commands.parentElement.classList.remove("vote-out");
+    renderVotePanel(s);
+  }
+
+  function hideVotePanel(animate) {
+    const panel = $("vote-panel");
+    if (panel.hidden || panel.classList.contains("leaving")) return;
+    if (!animate) { panel.hidden = true; return; }
+    panel.classList.add("leaving");
+    clearTimeout(votePanelTimer);
+    votePanelTimer = setTimeout(() => { panel.hidden = true; }, 900);
+  }
+
   /* "БОЙ 3/20" under the timer while a series runs; the last fight is flagged. */
   function renderSeries(s) {
     const el = $("series");
@@ -1353,6 +1518,12 @@
     const fresh = s.round !== seen.round || s.phase !== seen.phase;
     const prevPhase = seen.round === s.round ? seen.phase : null;
     seen = { round: s.round, phase: s.phase };
+
+    if (s.phase === "voting") showVotePanel(s);
+    else {
+      hideVotePanel(prevPhase === "voting");
+      els.commands.parentElement.classList.toggle("vote-out", s.phase === "fight" || s.phase === "result");
+    }
 
     switch (s.phase) {
       case "voting":

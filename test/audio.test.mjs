@@ -213,6 +213,32 @@ test('all three Vlad attack accents align to contact without changing voice spee
   assert.ok(scene.scheduled.some(t => t.ms < 0), 'late accents must be allowed to start before the dash');
 });
 
+test('all fighters keep original audio speed and pitch for normal hits, crits and KOs', () => {
+  const characters = [...Object.keys(Roster.CHARACTERS), 'gorilla'];
+  for (const attacker of characters) for (const defender of characters) {
+    if (attacker === defender) continue;
+    for (const flags of [{}, { crit: true }, { ko: true }, { crit: true, ko: true }]) {
+      const scene = audioScene('', true);
+      runInContext(`
+        CAST.fighter = Roster.CHARACTERS[${JSON.stringify(attacker)}] || null;
+        CAST.gorilla = Roster.CHARACTERS[${JSON.stringify(defender)}] || null;
+        preloadVoice('fighter'); preloadVoice('gorilla');
+        schedulePunch(${JSON.stringify({ by: 'fighter', ...flags })}, (fn, ms) => later(fn, ms + 1000));
+      `, scene.context);
+      scene.advanceTo(5000);
+      assert.ok(scene.played.length > 0);
+      for (const audio of scene.played) {
+        assert.equal(audio.playbackRate, 1, `${attacker}/${defender}: ${audio.src}`);
+        assert.equal(audio.preservesPitch, true, audio.src);
+      }
+      for (const audio of scene.played.filter(a => FightMedia.cue(a.src).peakMs > 0)) {
+        assert.equal(audio.startedAt + FightMedia.cue(audio.src).peakMs, 1170,
+          `attack accent no longer matches contact: ${audio.src}`);
+      }
+    }
+  }
+});
+
 test('Vlad crit uses one spoken line anchored independently of the video', () => {
   const scene = audioScene('', true);
   runInContext(`Math.random = () => 0.99; schedulePunch({by: 'fighter', crit: true}, (fn, ms) => later(fn, ms + 1000))`, scene.context);

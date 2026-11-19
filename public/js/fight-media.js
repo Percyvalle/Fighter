@@ -32,27 +32,25 @@
   const cue = src => audio[String(src).split('/').pop()] || { durationMs: 0, peakMs: 0 };
   const maxDuration = sources => Math.max(0, ...(sources || []).map(src => cue(src).durationMs));
 
-  // Maximum remaining sound at the final contact. Use the slowest allowed rate
-  // so random effect variations never shorten the host's presentation budget.
+  // Maximum remaining sound at final contact; all recordings play at 1x.
   function reactionTailMs(hit, attacker, defender) {
-    const heavy = hit.crit || hit.ko;
     const sfx = attacker?.sfx || {};
     let tail = 0;
     const punches = attacker ? sfx.punch || [] : ['gorilla-swing-1.mp3', 'gorilla-swing-2.mp3'];
     for (const src of punches) {
       const c = cue(src);
       if (hit.crit && sfx.crit && c.voice) continue;
-      tail = Math.max(tail, (c.durationMs - (c.peakMs || 0)) / (c.voice ? 1 : heavy ? 0.82 : 0.94));
+      tail = Math.max(tail, c.durationMs - (c.peakMs || 0));
     }
     if (hit.crit && sfx.crit) {
       const c = cue(sfx.crit);
       tail = Math.max(tail, c.durationMs - (c.peakMs || 0));
     }
     if (defender) tail = Math.max(tail, 60 + maxDuration(defender.sfx?.hurt));
-    else tail = Math.max(tail, 50 + cue('gorilla-yelp.ogg').durationMs / (heavy ? 0.88 : 0.95));
+    else tail = Math.max(tail, 50 + cue('gorilla-yelp.ogg').durationMs);
     if (!attacker) {
-      tail = Math.max(tail, cue('gorilla-roar.ogg').durationMs / (heavy ? 0.9 : 0.95) - 380,
-        880 / (0.72 * (heavy ? 0.9 : 0.97)));
+      tail = Math.max(tail, cue('gorilla-roar.ogg').durationMs - 380,
+        maxDuration([1, 2, 3].map(n => `vlad-punch-${n}.mp3`)));
     }
     return tail;
   }

@@ -117,7 +117,8 @@ test('auto-loop budgets the whole Vlad defeat and gorilla victory, in both corne
   const script = { winner: 'gorilla', reveal: 1700,
     hits: [{ at: 1000, by: 'gorilla', crit: true, ko: true }] };
   const hold = FightMedia.resultHoldMs(script, 'vlad', 'gorilla');
-  assert.ok(hold > 8500 && hold < 9000, `unexpected hold ${hold}`);
+  // At 1x the final thud no longer stretches the wait before result voices.
+  assert.ok(hold > 8000 && hold < 8500, `unexpected hold ${hold}`);
   assert.equal(Session.prototype.resultHoldMs.call({ script, character: 'vlad', opponent: 'gorilla',
     cfg: { game: { resultSeconds: 6 } } }), hold);
   assert.equal(Session.prototype.resultHoldMs.call({ script, character: 'vlad', opponent: 'gorilla',

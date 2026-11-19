@@ -35,6 +35,7 @@
   const CHARACTERS = {
     vlad: {
       name: 'ВЛАД',
+      label: 'Влад - Обычный',
       still: 'assets/fighter.png',
       idle: 'assets/anim/vlad-idle.webm',
       // straight punch, full reach at f72 of its source
@@ -52,6 +53,15 @@
         win: ['assets/sfx/vlad-win.ogg'],
         lose: ['assets/sfx/vlad-defeat.ogg'],
       },
+    },
+    // Keep Vlad's skins together in the character pickers.
+    fighter4: {
+      name: 'Цыган',
+      label: 'Влад - Цыган',
+      still: 'assets/fighter4.png',
+      idle: 'assets/anim/f4-idle.webm',
+      attack: { src: 'assets/anim/f4-punch.webm', contactMs: 375, reach: '32.8vw' },
+      head: 0.52,
     },
     fighter2: {
       name: 'ПАВЕР',
@@ -85,6 +95,8 @@
       sfx: PAVER_SFX,
     },
   };
+
+  CHARACTERS.fighter4.sfx = CHARACTERS.vlad.sfx;
 
   function winSounds(characterId, opponentId) {
     const sfx = CHARACTERS[characterId]?.sfx;

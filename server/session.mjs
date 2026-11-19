@@ -10,6 +10,7 @@ import { randomInt } from 'node:crypto';
 import { logger } from './log.mjs';
 import { clampVote } from './config.mjs';
 import { saveAntiStreak, validateAntiStreak } from './streak-settings.mjs';
+import { voteDisplay } from './vote-display.mjs';
 import '../public/js/fight.js';
 import '../public/js/roster.js';
 import '../public/js/fight-media.js';
@@ -389,6 +390,7 @@ export class Session {
       series: this.seriesNow(),
       votes: { 1: t[1], 2: t[2], 3: t[3] },
       total: t.total,
+      voteDisplay: this.phase === 'voting' ? voteDisplay(this.votes) : null,
       // The overlay needs the script (and so the winner) to animate the fight; it
       // is only revealed in text (panel, chat) once the phase reaches 'result'.
       // `elapsed` lets an overlay that connects mid-fight pick up where it is.
