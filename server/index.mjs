@@ -246,6 +246,14 @@ const server = createServer(async (req, res) => {
         }
         case 'character': session.setCharacter(String(b.value || '')); break;
         case 'opponent': session.setOpponent(String(b.value || '')); break;
+        case 'arena': {
+          try { session.setArena(b.value); }
+          catch (e) {
+            if (!e.status) log.error(`cannot save arena: ${e.message}`);
+            return json(res, e.status || 500, { ok: false, error: e.status ? e.message : 'Не удалось сохранить арену. Проверьте доступ к файлу конфигурации.' });
+          }
+          break;
+        }
         case 'series': session.setSeries(b.value); break;
         case 'voteSeconds': session.setVoteSeconds(b.value); break;
         case 'auto': session.setAuto(b.value); break;

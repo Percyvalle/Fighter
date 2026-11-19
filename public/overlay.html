@@ -35,7 +35,7 @@
     inset: 0;
     /* Gradient is a fallback while assets/bg.jpg is missing */
     background:
-      url("assets/bg.jpg") center / cover no-repeat,
+      var(--arena-background, url("assets/bg.jpg")) center / cover no-repeat,
       radial-gradient(ellipse at 50% 35%, #4a1a12 0%, #1c0a0a 55%, #070305 100%);
   }
 
@@ -685,9 +685,27 @@
 
 <script src="js/fight.js"></script>
 <script src="js/roster.js"></script>
+<script src="js/arenas.js"></script>
 <script src="js/fight-media.js"></script>
 <script>
   const $ = id => document.getElementById(id);
+  let currentArena = null;
+  let arenaRequest = 0;
+  function setArena(id) {
+    const selected = Arenas.has(id) ? id : Arenas.DEFAULT;
+    if (selected === currentArena) return;
+    currentArena = selected;
+    const request = ++arenaRequest;
+    const image = new Image();
+    image.onload = () => {
+      if (request === arenaRequest) {
+        document.documentElement.style.setProperty('--arena-background', `url("${Arenas.ARENAS[selected].background}")`);
+      }
+    };
+    image.onerror = () => { if (request === arenaRequest) currentArena = null; };
+    image.src = Arenas.ARENAS[selected].background;
+  }
+  setArena(new URLSearchParams(location.search).get('arena'));
   const els = {
     body:     document.body,
     banner:   $("banner"),
@@ -1511,6 +1529,7 @@
   let seen = { round: -1, phase: null };
 
   function onState(s) {
+    setArena(s.arena);
     if (s.character) setCharacter("fighter", s.character);
     if (s.opponent) setCharacter("gorilla", s.opponent);
     setNames(s.names);

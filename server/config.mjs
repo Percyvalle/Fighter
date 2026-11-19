@@ -25,6 +25,7 @@ const DEFAULTS = {
     names: { fighter: 'ВЛАД', gorilla: 'ГОРИЛЛА' },
     character: 'vlad',      // кто стоит слева при запуске: id из public/js/roster.js
     opponent: 'gorilla',    // кто стоит справа: 'gorilla' или id из public/js/roster.js
+    arena: 'temple',        // арена: id из public/js/arenas.js
     characters: {},         // свои имена персонажей: { "fighter2": "ИМЯ" }
     voteSeconds: 30,        // сколько идёт голосование перед боем
     resultSeconds: 6,       // минимум: длинные реплики/анимации продлевают показ

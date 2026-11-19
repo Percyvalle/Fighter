@@ -10,18 +10,21 @@ import { randomInt } from 'node:crypto';
 import { logger } from './log.mjs';
 import { clampVote } from './config.mjs';
 import { saveAntiStreak, validateAntiStreak } from './streak-settings.mjs';
+import { saveArena, validateArena } from './arena-settings.mjs';
 import { voteDisplay } from './vote-display.mjs';
 import '../public/js/fight.js';
 import '../public/js/roster.js';
 import '../public/js/fight-media.js';
 
 const log = logger('session');
-const { FightScript, Roster, FightMedia } = globalThis;
+const { FightScript, Roster, FightMedia, Arenas } = globalThis;
 
 export class Session {
-  constructor({ cfg, hub, outbox, points, persistAntiStreak = saveAntiStreak }) {
+  constructor({ cfg, hub, outbox, points, persistAntiStreak = saveAntiStreak, persistArena = saveArena }) {
     this.cfg = cfg; this.hub = hub; this.outbox = outbox; this.points = points;
     this.persistAntiStreak = persistAntiStreak;
+    this.persistArena = persistArena;
+    this.arena = Arenas.has(cfg.game.arena) ? cfg.game.arena : Arenas.DEFAULT;
     this.voteSeconds = cfg.game.voteSeconds;
     this.autoLoop = cfg.game.autoLoop;
     this.phase = 'idle';
@@ -225,6 +228,7 @@ export class Session {
 
   reset() {
     this.skip();
+    this.round = 0;
     this.wins = { fighter: 0, gorilla: 0 };
     this.history = [];
     this.series.done = 0;           // the series, if any, starts again from fight 1
@@ -331,6 +335,18 @@ export class Session {
     this.broadcast();
   }
 
+  setArena(value) {
+    if (this.phase === 'voting' || this.phase === 'fight') {
+      throw Object.assign(new Error('Арену можно менять только между боями — когда нет ставок и боя.'), { status: 409 });
+    }
+    const id = validateArena(value);
+    if (id === this.arena) return;
+    this.persistArena(id); // A failed write must leave the displayed arena intact.
+    this.arena = this.cfg.game.arena = id;
+    log.info(`arena: ${Arenas.ARENAS[id].name} (${id})`);
+    this.broadcast();
+  }
+
   setAntiStreak(value) {
     if (this.phase === 'voting' || this.phase === 'fight') {
       throw Object.assign(new Error('Защиту можно менять только между боями — когда нет ставок и боя.'), { status: 409 });
@@ -378,6 +394,8 @@ export class Session {
       round: this.round,
       names: this.cfg.game.names,
       character: this.character,
+      arena: this.arena,
+      arenas: Object.entries(Arenas.ARENAS).map(([id, a]) => ({ id, name: a.name })),
       characters: Object.keys(Roster.CHARACTERS).map(id => ({ id, name: this.nameOf(id), label: Roster.CHARACTERS[id].label })),
       opponent: this.opponent,
       gorilla: this.gorillaName,

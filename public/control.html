@@ -354,6 +354,10 @@
           <label for="opp">Соперник</label>
           <select id="opp"></select>
         </div>
+        <div class="setting" id="arena-box" title="Арена меняется между боями и сохраняется после перезапуска.">
+          <label for="arena">Арена</label>
+          <select id="arena"></select>
+        </div>
         <div class="setting" id="series-box">
           <label for="series">Серия боёв</label>
           <input id="series" type="number" min="0" max="500" step="1" placeholder="выкл">
@@ -367,6 +371,7 @@
           <input type="checkbox" id="auto"> Автоповтор боёв
         </label>
       </div>
+      <div id="arena-status" class="sub" role="status" aria-live="polite"></div>
       <details class="streak-disclosure">
       <summary><span>Защита от серий побед</span><span class="streak-summary-state" data-streak-summary>Подключение…</span></summary>
       <form class="streak-settings" id="streak-settings">
@@ -515,6 +520,7 @@ function renderSession(s) {
   if ($('vote-sec').value !== String(s.voteSeconds)) $('vote-sec').value = String(s.voteSeconds);
   $('auto').checked = !!s.autoLoop;
   renderCharacters(s);
+  renderArena(s);
   streakSettings.render(s);
   renderSeriesPick(s);
 
@@ -558,6 +564,21 @@ function renderSession(s) {
 /* The corner pickers: the left character and the right one (the gorilla or another
    roster character). Locked while bets are open or a fight is on, since viewers bet
    on a name; whoever stands in one corner is greyed out in the other. */
+function renderArena(s) {
+  const sel = $('arena');
+  const options = s.arenas || [];
+  const key = JSON.stringify(options);
+  if (sel.dataset.key !== key) {
+    sel.innerHTML = options.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+    sel.dataset.key = key;
+  }
+  sel.value = s.arena || 'temple';
+  sel.disabled = s.phase === 'voting' || s.phase === 'fight' || sel.dataset.pending === '1';
+  $('arena-box').title = sel.disabled
+    ? 'Можно сменить, когда нет ставок и боя.'
+    : 'Арена сохраняется после перезапуска.';
+}
+
 function renderCharacters(s) {
   const list = s.characters || [];
   const locked = s.phase === 'voting' || s.phase === 'fight';
@@ -792,6 +813,17 @@ $('b-give-all').onclick = e => giveAll(e.currentTarget, amountOf('give-all-amt')
 $('b-give-pct').onclick = e => giveAll(e.currentTarget, pctEach());
 $('char').onchange = e => cmd('character', { value: e.target.value });
 $('opp').onchange = e => cmd('opponent', { value: e.target.value });
+$('arena').onchange = async e => {
+  const sel = e.target;
+  sel.dataset.pending = '1';
+  sel.disabled = true;
+  $('arena-status').textContent = 'Сохраняем арену…';
+  const r = await cmd('arena', { value: sel.value });
+  delete sel.dataset.pending;
+  if (r.ok && r.session) renderSession(r.session);
+  else renderArena(state.session);
+  $('arena-status').textContent = r.ok ? 'Арена сохранена' : (r.error || 'Не удалось сменить арену');
+};
 function applySeries() {
   const inp = $('series');
   const n = Math.max(0, Math.min(500, Math.round(+inp.value) || 0));
