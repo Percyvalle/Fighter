@@ -11,6 +11,7 @@
     --hp-yellow: #ffd23f;
     --frame: #ffffff;
     --ink: #0b0b12;
+    --fighter-scale: 0.95;
     --reach: 34vw;   /* how far the attacker dashes in: fist to body at 16:9 */
     /* a roster character's dashes come from public/js/roster.js, set on its corner */
     --reach-swing: 37vw; /* gorilla's attack dash: swung fist to Vlad at 16:9 */
@@ -58,7 +59,7 @@
   .fighter-wrap {
     position: absolute;
     bottom: 4vh;
-    height: min(72vh, 95vw);
+    height: calc(min(72vh, 95vw) * var(--fighter-scale));
     z-index: 3;
     transition: transform var(--contact-duration, 170ms) cubic-bezier(.2, .9, .3, 1.3), opacity 0.4s ease;
   }
@@ -66,7 +67,7 @@
   .fighter-wrap.right { right: 4vw; }
 
   /* Same height for both; width follows each image's own aspect ratio */
-  #fighter, #gorilla { height: min(72vh, 95vw); }
+  #fighter, #gorilla { height: calc(min(72vh, 95vw) * var(--fighter-scale)); }
 
   /* gorilla PNG has transparent padding (visible figure = 959 of 1152px, 48px empty
      at the bottom) while the fighter fills his PNG; enlarge the gorilla image so the
@@ -600,7 +601,7 @@
   @media (max-aspect-ratio: 1/1) {
     :root { --reach: 20vw; }
     .fighter-wrap { bottom: 10vh; }
-    #fighter, #gorilla { height: 48vh; }
+    #fighter, #gorilla { height: calc(48vh * var(--fighter-scale)); }
   }
 </style>
 </head>
@@ -933,12 +934,20 @@
   }
 
   function setReach() {
+    // Dashes were calibrated at full size. Shrinking both sprites leaves more
+    // space to cross between the corner anchors, which sit 92vw apart.
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fighter-scale")) || 1;
+    const extra = 92 * (1 - scale);
+    const reach = value => `calc(${value} * ${scale} + ${extra}vw)`;
+    els.gorilla.style.setProperty("--reach-swing", reach("37vw"));
+    els.gorilla.style.setProperty("--reach-slam", reach("37vw"));
     for (const side of ["fighter", "gorilla"]) {
+      els[side].style.setProperty("--reach", reach(innerWidth <= innerHeight ? "20vw" : "34vw"));
       const c = CAST[side];
       if (!c) continue;
       const gap = Math.round(gorillaFace() - faceFromEdge(other(side)));
-      els[side].style.setProperty("--reach-punch", `calc(${c.attack.reach} + ${gap}px)`);
-      els[side].style.setProperty("--reach-kick", `calc(${(c.crit || c.attack).reach} + ${gap}px)`);
+      els[side].style.setProperty("--reach-punch", `calc(${c.attack.reach} * ${scale} + ${extra}vw + ${gap}px)`);
+      els[side].style.setProperty("--reach-kick", `calc(${(c.crit || c.attack).reach} * ${scale} + ${extra}vw + ${gap}px)`);
     }
   }
 
