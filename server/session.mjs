@@ -141,7 +141,7 @@ export class Session {
     const t = this.tally();
     this.phase = 'fight';
     this.pending = this.roll();
-    this.script = FightScript.make(this.pending, n => randomInt(n));
+    this.script = FightScript.make(this.pending, n => randomInt(n), { fighter: this.character, gorilla: this.opponent });
     this.fightAt = Date.now();
     // Only drives the once-a-second push (panel countdown); reveal() has its own timer.
     this.endsAt = this.fightAt + this.script.reveal;
@@ -417,6 +417,7 @@ export class Session {
         : null,
       // Final health, for an overlay that connects after the KO.
       hp: this.phase === 'result' && this.script ? this.script.hits.at(-1).hp : null,
+      meter: this.phase === 'result' && this.script ? this.script.meter : null,
       // Rounds won by each side, shown on the result screen and in the panel.
       score: this.phase === 'result' && this.script ? this.script.score : null,
       winner: this.winner,

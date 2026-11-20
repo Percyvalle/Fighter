@@ -120,6 +120,12 @@
   .fighter-wrap .cast .anim { position: absolute; left: 0; bottom: 0; visibility: hidden; animation: none; }
   .cast.has-anim .still { visibility: hidden; }
   .cast.has-anim .clip-idle { visibility: visible; }
+  .fighter-wrap.casting .cast .clip-idle { visibility: hidden; }
+  .fighter-wrap.casting .cast .clip-super { visibility: visible; }
+  .fighter-wrap .cast .clip-super { max-width: none; }
+  .super-dim { position: absolute; inset: 0; z-index: 6; background: #000; opacity: 0; transition: opacity 120ms; pointer-events: none; }
+  .fighter-wrap.super-caster { z-index: 8; }
+  #super-fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 9; pointer-events: none; }
   .fighter-wrap.kicking .cast .clip-idle { visibility: hidden; }
   .fighter-wrap.kicking .cast .clip-crit { visibility: visible; }
   .fighter-wrap.punching .cast .clip-idle { visibility: hidden; }
@@ -223,6 +229,14 @@
   .p2 .hp-fill { background-image:
       linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%),
       linear-gradient(90deg, var(--hp-yellow) 0%, var(--hp-orange) 40%, var(--hp-red) 100%); }
+
+  .super-gauge { width: min(45%, 310px); min-width: 110px; margin-top: 6px; }
+  .super-gauge[hidden] { display: none; }
+  .p2 .super-gauge { margin-left: auto; text-align: right; }
+  .super-track { height: 10px; overflow: hidden; background: #191419; border: 1px solid #86704b; transform: skewX(-16deg); }
+  .super-fill { height: 100%; width: 0; background: linear-gradient(90deg,#b53309,#ff9f14,#ffe8a0); transition: width 250ms ease-out; }
+  .p2 .super-fill { margin-left: auto; }
+  .super-gauge.ready .super-track { border-color: #fff0b0; box-shadow: 0 0 14px #ff8c14; }
 
   .player-name {
     margin-top: 0.8vh;
@@ -608,6 +622,8 @@
 <body>
 
   <div class="stage">
+    <div class="super-dim" id="super-dim"></div>
+    <canvas id="super-fx" aria-hidden="true"></canvas>
     <div class="fighter-wrap left" id="fighter">
       <div class="cast"><img class="sprite still" src="assets/fighter.png" alt=""></div>
     </div>
@@ -631,6 +647,9 @@
         <div class="player-name" data-name="fighter">ВЛАД</div>
         <div class="pips" id="pips-fighter"></div>
       </div>
+      <div class="super-gauge" id="super-gauge-fighter" hidden>
+        <div class="super-track" role="progressbar" aria-label="Заряд суперудара слева" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><div class="super-fill"></div></div>
+      </div>
     </div>
 
     <div class="timer" id="timer">30</div>
@@ -643,6 +662,9 @@
       <div class="player-meta">
         <div class="player-name" data-name="gorilla">ГОРИЛЛА</div>
         <div class="pips" id="pips-gorilla"></div>
+      </div>
+      <div class="super-gauge" id="super-gauge-gorilla" hidden>
+        <div class="super-track" role="progressbar" aria-label="Заряд суперудара справа" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0"><div class="super-fill"></div></div>
       </div>
     </div>
   </div>
@@ -688,6 +710,7 @@
 <script src="js/roster.js"></script>
 <script src="js/arenas.js"></script>
 <script src="js/fight-media.js"></script>
+<script src="js/fireball.js"></script>
 <script>
   const $ = id => document.getElementById(id);
   let currentArena = null;
@@ -744,6 +767,7 @@
     pending = [];
     // A cancelled fight must also stop reactions already playing.
     stopVoices();
+    if (typeof fireballFX !== 'undefined') fireballFX.stop();
   }
 
   // Restart a CSS animation class even if it's already applied
@@ -755,6 +779,20 @@
 
   function setHP(who, percent) {
     els.hp[who].forEach(bar => bar.style.width = percent + "%");
+  }
+
+  let meterValues = { fighter: 0, gorilla: 0 };
+  function setMeters(values = { fighter: 0, gorilla: 0 }) {
+    meterValues = { ...values };
+    for (const side of ["fighter", "gorilla"]) {
+      const el = $("super-gauge-" + side);
+      const units = Math.max(0, Math.min(FightScript.METER_MAX, values[side] || 0));
+      el.hidden = !CAST[side]?.super;
+      el.classList.toggle("ready", units === FightScript.METER_MAX);
+      el.querySelector(".super-fill").style.width = (units / FightScript.METER_MAX * 100) + "%";
+      el.querySelector(".super-track").setAttribute("aria-valuenow", units);
+      el.querySelector(".super-track").setAttribute("aria-valuetext", units === FightScript.METER_MAX ? "Супер готов" : `${units} из ${FightScript.METER_MAX}`);
+    }
   }
 
   function showBanner(text, mode) {
@@ -821,8 +859,8 @@
   function popDamage(def, hit) {
     const r = def.getBoundingClientRect();
     const el = document.createElement("div");
-    el.className = "dmg" + (hit.crit ? " crit" : "");
-    el.innerHTML = hit.crit ? `<small>КРИТ!</small>-${hit.dmg}` : `-${hit.dmg}`;
+    el.className = "dmg" + (hit.crit || hit.super ? " crit" : "");
+    el.innerHTML = hit.super ? `<small>СУПЕР!</small>-${hit.dmg}` : hit.crit ? `<small>КРИТ!</small>-${hit.dmg}` : `-${hit.dmg}`;
     // Over the head, not the middle of the box: a roster character's head is in the
     // roster (Vlad's sits a little right of centre; mirrored in the right corner), the
     // gorilla's well to the left of its hunched back.
@@ -854,6 +892,7 @@
   const ANIM = { fighter: null, gorilla: BEAST };
   // The roster entry in each corner; null in the right one is the gorilla.
   const CAST = { fighter: null, gorilla: null };
+  const fireballFX = FireballFX.create({ canvas: $("super-fx"), dim: $("super-dim"), corners: els });
 
   /* `box` takes .has-anim: the corner itself for the gorilla, its .cast for a character. */
   function wireAnim(side, box) {
@@ -862,7 +901,7 @@
     // browsers both handle VP9 alpha; if one doesn't, the still and CSS sway stay).
     a.idle.addEventListener("playing", () => { a.ready = true; box.classList.add("has-anim"); }, { once: true });
     a.idle.play().catch(() => {});
-    for (const clip of [a, a.crit].filter(Boolean)) {
+    for (const clip of [a, a.crit, a.super].filter(Boolean)) {
       clip.attack.load();
       clip.attack.addEventListener("ended", () => {
         els[side].classList.remove(clip.cls);
@@ -892,7 +931,7 @@
     const el = els[side], box = el.querySelector(".cast");
     box.querySelectorAll("video").forEach(v => { v.pause(); v.remove(); });
     box.classList.remove("has-anim");
-    el.classList.remove("punching", "kicking", "losing", "striking", "slamming", "cheering");
+    el.classList.remove("punching", "kicking", "casting", "super-caster", "losing", "striking", "slamming", "cheering");
     if (side === "gorilla") {
       el.classList.toggle("rival", !!c);
       // The gorilla's clips idle out of sight while someone else stands there.
@@ -907,13 +946,15 @@
       const a = { idle: clipVideo(c.idle, "clip-idle", true), attack: clipVideo(c.attack.src, "clip-attack"),
                   contactMs: c.attack.contactMs, cls: "punching", ready: false };
       if (c.crit) a.crit = { attack: clipVideo(c.crit.src, "clip-crit"), contactMs: c.crit.contactMs, cls: "kicking" };
+      if (c.super) a.super = { ...c.super, attack: clipVideo(c.super.src, "clip-super"), cls: "casting" };
       if (c.defeat) a.defeat = clipVideo(c.defeat, "clip-defeat");
-      box.append(...[a.idle, a.attack, a.crit && a.crit.attack, a.defeat].filter(Boolean));
+      box.append(...[a.idle, a.attack, a.crit && a.crit.attack, a.super && a.super.attack, a.defeat].filter(Boolean));
       ANIM[side] = a;
       wireAnim(side, box);
     }
     if (soundReady) preloadVoice(side);
     setReach();
+    setMeters(meterValues);
   }
 
   /* The roster's dashes carry a fist to the gorilla's face. A person's face stands
@@ -961,7 +1002,7 @@
   setCharacter("gorilla", new URLSearchParams(location.search).get("vs") || "gorilla");
 
   /* The clip a blow uses: the crit one on a critical blow, if the fighter has it. */
-  const clipFor = h => (h.crit && ANIM[h.by].crit) || ANIM[h.by];
+  const clipFor = h => (h.super && ANIM[h.by].super) || (h.crit && ANIM[h.by].crit) || ANIM[h.by];
 
   function attackStart(h, elapsedMs = 0) {
     if (!ANIM[h.by].ready) return;
@@ -1021,7 +1062,7 @@
   function attackStop(onlySide) {
     for (const side of onlySide ? [onlySide] : ["fighter", "gorilla"]) {
       ANIM[side].generation = (ANIM[side].generation || 0) + 1;
-      for (const clip of [ANIM[side], ANIM[side].crit].filter(Boolean)) {
+      for (const clip of [ANIM[side], ANIM[side].crit, ANIM[side].super].filter(Boolean)) {
         clip.attack.pause();
         els[side].classList.remove(clip.cls);
       }
@@ -1058,6 +1099,8 @@
   // ...and its victory roar with the win clip (Epic_gorilla_victory_#3: both cries, the
   // 3 s pause between them cut out).
   const gorillaWin = clip("assets/sfx/gorilla-win.ogg");
+  const fireballLaunch = clip("assets/sfx/fireball-launch.ogg");
+  const fireballImpact = clip("assets/sfx/fireball-impact.ogg");
 
   const clips = {};
   const clipOf = src => clips[src] || (clips[src] = clip(src));
@@ -1186,12 +1229,16 @@
     // Vary the recording without changing its speed or pitch.
     const a = pick(set);
     // A crit or KO lands heavier through volume.
-    const heavy = hit.crit || hit.ko;
+    const heavy = hit.crit || hit.ko || hit.super;
     // A crit has its own spoken line; do not layer a second Vlad line over it.
     if (!(hit.crit && VOICE[hit.by].crit && a.cue?.voice)) {
       schedule(() => playVoice(a, heavy ? 1 : 0.85, 0), TIMING.contact - (a.cue?.peakMs || 0));
     }
-    if (set.thud) {
+    if (hit.super === "fireball") {
+      const flightMs = Roster.CHARACTERS.vlad.super.contactMs - Roster.CHARACTERS.vlad.super.releaseMs;
+      schedule(() => playVoice(fireballLaunch.cloneNode(), 0.8, 0), TIMING.contact - flightMs);
+      schedule(() => playVoice(fireballImpact.cloneNode(), 0.95, 0), TIMING.contact);
+    } else if (set.thud) {
       const t = set.thud.clips[Math.floor(Math.random() * set.thud.clips.length)].cloneNode();
       schedule(() => playVoice(t, set.thud.volume, 0), TIMING.contact);
     }
@@ -1283,12 +1330,13 @@
     const atk = els[hit.by], def = els[other(hit.by)];
     atk.classList.remove("knock");
     def.classList.remove("crit");
-    atk.classList.add("atk");
+    if (!hit.super) atk.classList.add("atk");
     later(() => {
       def.classList.add("hit", "knock");
-      def.classList.toggle("crit", !!hit.crit);
+      def.classList.toggle("crit", !!(hit.crit || hit.super));
       setHP("fighter", hit.hp.fighter);
       setHP("gorilla", hit.hp.gorilla);
+      if (hit.meter) setMeters(hit.meter);
       popDamage(def, hit);
       shake(hit.dmg < 18 && !hit.ko && !hit.crit);
       els.impact.classList.toggle("crit", !!hit.crit);
@@ -1312,6 +1360,7 @@
      (an overlay that joins after it was shown). */
   function startRound(r, quiet) {
     resetIdle();
+    setMeters(r.meterStart);
     setHP("fighter", 100);
     setHP("gorilla", 100);
     els.timer.textContent = String(ROUND_SECONDS);
@@ -1365,6 +1414,7 @@
       const h = landed[landed.length - 1];
       setHP("fighter", h.hp.fighter);
       setHP("gorilla", h.hp.gorilla);
+      setMeters(h.meter);
       if (h.ko) els[other(h.by)].classList.add("defeated");
     }
 
@@ -1388,10 +1438,16 @@
       }
       // Each blow is the attacker's attack clip: start it early so it lands on contact.
       const clipStart = h.at + TIMING.contact - clipFor(h).contactMs;
-      at(clipStart, () => attackStart(h));
+      const begin = (offset = 0) => {
+        if (h.super) setMeters({ ...meterValues, [h.by]: 0 });
+        attackStart(h, offset);
+        if (h.super && ANIM[h.by].super) fireballFX.start(h.by, CAST[h.by].super, ANIM[h.by].super.attack, offset);
+      };
+      at(clipStart, () => begin());
       // A late join can land inside the wind-up: show its current frame, not idle.
-      if (clipStart < elapsed && elapsed < h.at + TIMING.contact) {
-        at(elapsed, () => attackStart(h, elapsed - clipStart));
+      const clipEnd = h.super ? clipStart + clipFor(h).durationMs : h.at + TIMING.contact;
+      if (clipStart < elapsed && elapsed < clipEnd) {
+        at(elapsed, () => begin(elapsed - clipStart));
       }
       schedulePunch(h, (fn, offset) => at(h.at + offset, fn));
     }
@@ -1417,7 +1473,7 @@
   let demoTimer = null;
   function demoFight(winner) {
     winner = winner || (Math.random() < 0.5 ? "fighter" : "gorilla");
-    const script = FightScript.make(winner, n => Math.floor(Math.random() * n));
+    const script = FightScript.make(winner, n => Math.floor(Math.random() * n), { fighter: characterId("fighter"), gorilla: characterId("gorilla") });
     playFight(script, true);
     // The next fight once this one's result has had its moment (fights run 23-35 s).
     clearTimeout(demoTimer);
@@ -1428,12 +1484,27 @@
   function skipFight() {
     clearPending();
     resetIdle();
+    setMeters();
     stopMusic(300);
     setPips(null);
     setHP("fighter", 100);
     setHP("gorilla", 100);
     els.timer.textContent = String(ROUND_SECONDS);
     els.timer.classList.remove("urgent");
+  }
+
+  function demoSuper() {
+    const side = characterId("fighter") === "vlad" ? "fighter" : characterId("gorilla") === "vlad" ? "gorilla" : null;
+    if (!side) return;
+    clearTimeout(demoTimer);
+    skipFight();
+    const hit = { by: side, crit: false, super: "fireball", dmg: 35, meter: { fighter: 0, gorilla: 0 },
+      hp: { fighter: side === "fighter" ? 100 : 65, gorilla: side === "gorilla" ? 100 : 65 } };
+    const spec = CAST[side].super;
+    attackStart(hit);
+    fireballFX.start(side, spec, ANIM[side].super.attack);
+    later(() => blow(hit, false), spec.contactMs-TIMING.contact);
+    schedulePunch(hit, (fn, offset) => later(fn, spec.contactMs-TIMING.contact+offset));
   }
 
   els.body.addEventListener("animationend", e => {
@@ -1575,6 +1646,7 @@
         caption("");
         // Connected after the fight animation: jump straight to its last frame.
         if (fresh && prevPhase !== "fight") { skipFight(); showResult(s.winner, s.hp); }
+        setMeters(s.meter || {});
         if (fresh) {
           setPips(s.score);
           const sc = s.score ? `<b>${s.score[s.winner]}:${s.score[other(s.winner)]}</b> · ` : "";
@@ -1633,6 +1705,7 @@
       if (e.key === "1") demoFight("fighter");
       else if (e.key === "2") demoFight("gorilla");
       else if (e.key === "3") { clearTimeout(demoTimer); skipFight(); }
+      else if (e.key === "4") demoSuper();
       else if (e.key === " ") demoFight();
     });
     // Each fight schedules the next one when it is over.

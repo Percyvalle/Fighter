@@ -5,6 +5,8 @@
   const CONTACT_MS = 170;
   const RESULT_GAP_MS = 250;
   const audio = {
+    'fireball-launch.ogg': { durationMs: 500, peakMs: 0 },
+    'fireball-impact.ogg': { durationMs: 900, peakMs: 0 },
     'vlad-attack-a.mp3': { durationMs: 680, peakMs: 175, voice: true },
     'vlad-attack-c.mp3': { durationMs: 667, peakMs: 215, voice: true },
     'vlad-attack-original.mp3': { durationMs: 1140, peakMs: 475, voice: true },
@@ -36,6 +38,7 @@
   function reactionTailMs(hit, attacker, defender) {
     const sfx = attacker?.sfx || {};
     let tail = 0;
+    if (hit.super) tail = cue('fireball-impact.ogg').durationMs;
     const punches = attacker ? sfx.punch || [] : ['gorilla-swing-1.mp3', 'gorilla-swing-2.mp3'];
     for (const src of punches) {
       const c = cue(src);

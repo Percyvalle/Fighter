@@ -65,6 +65,25 @@ function advance(scene) {
   }
 }
 
+test('fireball launch precedes contact and its impact stays on the damage cue at 1x', () => {
+  const scene = audioScene();
+  runInContext(`schedulePunch({by:'fighter',crit:true,super:'fireball'}, (fn,ms)=>later(fn,ms+1000))`, scene.context);
+  scene.advanceTo(1200);
+  const launch=scene.played.find(a=>a.src.endsWith('fireball-launch.ogg'));
+  const impact=scene.played.find(a=>a.src.endsWith('fireball-impact.ogg'));
+  assert.equal(launch.startedAt,920);
+  assert.equal(impact.startedAt,1170);
+  assert.equal(launch.playbackRate,1);
+  assert.equal(impact.playbackRate,1);
+});
+
+test('fight cancellation clears fireball focus and particles along with audio', () => {
+  const scene=audioScene();let stopped=0;
+  scene.context.fireballFX={stop(){stopped++;}};
+  runInContext('clearPending()',scene.context);
+  assert.equal(stopped,1);
+});
+
 test('Vlad has playable assets for every sound category', () => {
   const sfx = Roster.CHARACTERS.vlad.sfx;
   for (const field of ['punch', 'hurt', 'win', 'lose', 'crit']) {

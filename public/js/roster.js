@@ -42,6 +42,8 @@
       attack: { src: 'assets/anim/vlad-punch.webm', contactMs: 542, reach: '33vw' },
       // spinning kick: foot out, the strike flash about to fire
       crit: { src: 'assets/anim/vlad-kick.webm', contactMs: 520, reach: '35vw' },
+      super: { src: 'assets/anim/vlad-fireball.webm', contactMs: 3050, durationMs: 5000,
+        chargeMs: 800, releaseMs: 2800, hand: { x: 0.76, y: 0.17 }, charge: { x: 0.20, y: 0.35 } },
       // doubles over, tears his T-shirt, cries; stops on its last frame
       defeat: 'assets/anim/vlad-defeat.webm',
       head: 0.55,
